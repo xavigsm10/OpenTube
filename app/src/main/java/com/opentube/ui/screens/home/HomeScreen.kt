@@ -4,14 +4,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,28 +26,79 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.opentube.R
 import com.opentube.ui.components.VideoCard
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.absoluteValue
 
-/**
- * Home screen showing trending videos
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onVideoClick: (String) -> Unit,
-    onPlaylistClick: (String) -> Unit,
-    onAlbumClick: (String) -> Unit,
-    onSearchClick: () -> Unit = {},
+    onSearchClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val currentRegion by viewModel.currentRegion.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     
+    var showRegionDialog by remember { mutableStateOf(false) }
 
+    val availableCountries = remember {
+        listOf(
+            "Global" to "GLOBAL",
+            "Argentina" to "AR",
+            "Brazil" to "BR",
+            "Canada" to "CA",
+            "Chile" to "CL",
+            "Colombia" to "CO",
+            "France" to "FR",
+            "Germany" to "DE",
+            "India" to "IN",
+            "Italy" to "IT",
+            "Japan" to "JP",
+            "Mexico" to "MX",
+            "Russia" to "RU",
+            "South Korea" to "KR",
+            "Spain" to "ES",
+            "United Kingdom" to "GB",
+            "United States" to "US",
+            "Venezuela" to "VE"
+        ).sortedBy { it.first }
+    }
+
+    if (showRegionDialog) {
+        AlertDialog(
+            onDismissRequest = { showRegionDialog = false },
+            title = { Text("Seleccionar Región") },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 400.dp)
+                ) {
+                    items(availableCountries) { (name, code) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.updateRegion(code)
+                                    showRegionDialog = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = (code == currentRegion),
+                                onClick = null 
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = name)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRegionDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
     
     // Modo normal de videos (YouTube-like)
     
@@ -56,6 +112,13 @@ fun HomeScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = { showRegionDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Public, // Globe icon
+                            contentDescription = "Region",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -74,12 +137,11 @@ fun HomeScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
                 ),
-                windowInsets = WindowInsets(
-                    top = 8.dp,
-                    bottom = 0.dp
-                )
+                // Fix: Usar statusBars padding en lugar de hardcoded values
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0.dp)
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -88,17 +150,40 @@ fun HomeScreen(
         ) {
             when (val state = uiState) {
                 is HomeUiState.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    Surface(
+                         modifier = Modifier
+                             .fillMaxSize(),
+                         color = MaterialTheme.colorScheme.background
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Cargando contenido...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
                 }
                 
                 is HomeUiState.Success -> {
-                    LazyColumn(
+                    Surface(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        color = MaterialTheme.colorScheme.background
                     ) {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize(),
+                            contentPadding = PaddingValues(vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
                         // Tarjetas de categorías
                         item {
                             LazyRow(
@@ -151,6 +236,7 @@ fun HomeScreen(
                         }
                     }
                 }
+                }
                 
                 is HomeUiState.Error -> {
                     Column(
@@ -170,7 +256,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         Button(
-                            onClick = { viewModel.retry() }
+                            onClick = { viewModel.refresh() }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,

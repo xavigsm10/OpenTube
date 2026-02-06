@@ -29,6 +29,7 @@ fun SettingsScreen(
     var showAboutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showCountryDialog by remember { mutableStateOf(false) }
+    var showInstanceDialog by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -50,6 +51,47 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Piped Settings Section
+            item {
+                SectionHeader(title = "Ajustes Piped")
+            }
+            
+            item {
+                SwitchSettingsItem(
+                    icon = Icons.Default.CloudOff,
+                    title = "Modo local completo",
+                    subtitle = if (settings.fullLocalMode) 
+                        "Usando NewPipe Extractor (sin Piped)" 
+                    else 
+                        "Usando API de Piped",
+                    checked = settings.fullLocalMode,
+                    onCheckedChange = { viewModel.setFullLocalMode(it) }
+                )
+            }
+            
+            item {
+                SwitchSettingsItem(
+                    icon = Icons.Default.Download,
+                    title = "Extracción local de streams",
+                    subtitle = "Extraer URLs de video localmente para mejor rendimiento",
+                    checked = settings.localStreamExtraction,
+                    onCheckedChange = { viewModel.setLocalStreamExtraction(it) },
+                    enabled = !settings.fullLocalMode
+                )
+            }
+            
+            item {
+                SettingsItem(
+                    icon = Icons.Default.Cloud,
+                    title = "Instancia Piped",
+                    subtitle = if (settings.fullLocalMode) "Deshabilitado (modo local)" else settings.instanceApiUrl,
+                    onClick = { if (!settings.fullLocalMode) showInstanceDialog = true },
+                    enabled = !settings.fullLocalMode
+                )
+            }
+            
+            item { Divider() }
+
             // Content Section
             item {
                 SectionHeader(title = "Contenido")
@@ -309,7 +351,75 @@ fun SettingsScreen(
             onDismiss = { showCountryDialog = false }
         )
     }
+
+    if (showInstanceDialog) {
+        InstanceDialog(
+            currentUrl = settings.instanceApiUrl,
+            onUrlSelected = { 
+                viewModel.setInstanceApiUrl(it)
+                showInstanceDialog = false
+            },
+            onDismiss = { showInstanceDialog = false }
+        )
+    }
 }
+
+@Composable
+private fun InstanceDialog(
+    currentUrl: String,
+    onUrlSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(currentUrl) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Instancia Piped") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("URL de la API") },
+                    singleLine = true,
+                    // isError = !text.startsWith("http"), supportText = "Debe ser una URL válida"
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Opciones rápidas:", style = MaterialTheme.typography.bodySmall)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { text = "https://pipedapi.adminforge.de/" },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Usar adminforge.de (Recomendado)")
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = { text = "https://pipedapi.kavin.rocks/" },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Usar kavin.rocks")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { 
+                if (text.isNotBlank()) {
+                    onUrlSelected(text)
+                }
+            }) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+             TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
 
 @Composable
 private fun SectionHeader(title: String) {
@@ -328,19 +438,24 @@ private fun SettingsItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(
+                if (enabled) Modifier.clickable(onClick = onClick) 
+                else Modifier
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = if (enabled) MaterialTheme.colorScheme.primary 
+                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.size(24.dp)
         )
         
@@ -349,12 +464,15 @@ private fun SettingsItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface 
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant 
+                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
     }

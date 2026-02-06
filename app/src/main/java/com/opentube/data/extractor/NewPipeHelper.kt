@@ -42,14 +42,7 @@ class NewPipeHelper @Inject constructor(
                 contentLanguage = preferences[androidx.datastore.preferences.core.stringPreferencesKey("content_language")] ?: "es"
                 contentCountry = preferences[androidx.datastore.preferences.core.stringPreferencesKey("content_country")] ?: "ES"
                 
-                try {
-                    // TODO: Fix Localization import and usage
-                    // val localization = Localization(contentCountry, contentLanguage)
-                    // ServiceList.YouTube.setLocalization(localization)
-                    android.util.Log.d("NewPipeHelper", "Localization updated: $contentCountry - $contentLanguage")
-                } catch (e: Exception) {
-                    android.util.Log.e("NewPipeHelper", "Error updating localization", e)
-                }
+                android.util.Log.d("NewPipeHelper", "Region updated: $contentLanguage-$contentCountry")
             }
         }
     }
@@ -125,12 +118,18 @@ class NewPipeHelper @Inject constructor(
                     emptyList()
                 )
             } else {
-                // Páginas siguientes - obtener directamente InfoItemsPage
-                SearchInfo.getMoreItems(
-                    ServiceList.YouTube,
-                    ServiceList.YouTube.searchQHFactory.fromQuery(query),
-                    Page(pageUrl)
-                )
+                // Páginas siguientes - deserializar el Page y obtener items
+                val page = PagedResult.deserializePage(pageUrl)
+                if (page != null) {
+                    SearchInfo.getMoreItems(
+                        ServiceList.YouTube,
+                        ServiceList.YouTube.searchQHFactory.fromQuery(query),
+                        page
+                    )
+                } else {
+                    // Fallback si no se puede deserializar
+                    return@withContext Result.failure(Exception("Invalid page data"))
+                }
             }
             
             val videos = itemsPage.items
@@ -152,8 +151,9 @@ class NewPipeHelper @Inject constructor(
                     )
                 }
             
-            val nextPage = itemsPage.nextPage?.url
-            Result.success(PagedResult(videos, nextPage))
+            // Serializar el Page completo para la siguiente página
+            val nextPageSerialized = PagedResult.serializePage(itemsPage.nextPage)
+            Result.success(PagedResult(videos, nextPageSerialized))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -169,29 +169,38 @@ class NewPipeHelper @Inject constructor(
     /**
      * Obtener videos trending/populares con paginación
      */
+    /**
+     * Obtener videos trending/populares con paginación
+     */
     suspend fun getTrendingVideosPaged(pageUrl: String? = null): Result<PagedResult<Video>> = withContext(Dispatchers.IO) {
         try {
-            val kiosk = ServiceList.YouTube.getKioskList().defaultKioskExtractor
-            val trendingUrl = if (contentCountry.isNotEmpty() && contentCountry != "GLOBAL") {
-                "https://www.youtube.com/feed/trending?gl=$contentCountry"
-            } else {
-                kiosk.url
-            }
+            val kioskList = ServiceList.YouTube.kioskList
             
+            // Force content country if set, similar to LibreTube
+            if (contentCountry.isNotEmpty()) {
+                try {
+                    kioskList.forceContentCountry(org.schabi.newpipe.extractor.localization.ContentCountry(contentCountry))
+                } catch (e: Exception) {
+                     android.util.Log.e("NewPipeHelper", "Error forcing content country: $contentCountry", e)
+                }
+            }
+
+            val kioskExtractor = kioskList.getExtractorById("Trending", null)
+
             val itemsPage = if (pageUrl == null) {
-                // Primera página - obtener KioskInfo
-                val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(ServiceList.YouTube, trendingUrl)
-                // Crear InfoItemsPage manualmente desde KioskInfo
+                // Fetch first page
+                kioskExtractor.fetchPage()
+                val info = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
                 org.schabi.newpipe.extractor.ListExtractor.InfoItemsPage(
-                    kioskInfo.getRelatedItems(),
-                    kioskInfo.getNextPage(),
+                    info.relatedItems,
+                    info.nextPage,
                     emptyList()
                 )
             } else {
-                // Páginas siguientes - obtener directamente InfoItemsPage
-                org.schabi.newpipe.extractor.kiosk.KioskInfo.getMoreItems(
+                 // Fetch next page
+                 org.schabi.newpipe.extractor.kiosk.KioskInfo.getMoreItems(
                     ServiceList.YouTube,
-                    trendingUrl,
+                    kioskExtractor.url,
                     Page(pageUrl)
                 )
             }
@@ -214,12 +223,41 @@ class NewPipeHelper @Inject constructor(
                         isLive = item.streamType == StreamType.LIVE_STREAM
                     )
                 }
-                .filter { !it.isLive }
             
             val nextPage = itemsPage.nextPage?.url
             Result.success(PagedResult(videos, nextPage))
         } catch (e: Exception) {
-            Result.failure(e)
+             android.util.Log.e("NewPipeHelper", "Error getting trending videos", e)
+             // Fallback attempt with manual URL if standard way fails
+             try {
+                val manualUrl = if (contentCountry.isNotEmpty() && contentCountry != "GLOBAL") {
+                     "https://www.youtube.com/feed/trending?gl=$contentCountry"
+                } else {
+                     "https://www.youtube.com/feed/trending"
+                }
+                val info = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(ServiceList.YouTube, manualUrl)
+                val videos = info.relatedItems
+                    .filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>()
+                    .map { item ->
+                        Video(
+                            url = item.url,
+                            title = item.name,
+                            thumbnail = item.thumbnails.maxByOrNull { it.height }?.url ?: "",
+                            uploaderName = item.uploaderName ?: "",
+                            uploaderUrl = item.uploaderUrl,
+                            uploaderAvatar = item.uploaderAvatars.maxByOrNull { it.height }?.url,
+                            uploadedDate = item.uploadDate?.offsetDateTime()?.toString(),
+                            duration = item.duration,
+                            views = item.viewCount,
+                            uploaderVerified = item.isUploaderVerified,
+                            isShort = item.duration > 0 && item.duration < 60,
+                            isLive = item.streamType == StreamType.LIVE_STREAM
+                        )
+                    }
+                 Result.success(PagedResult(videos, info.nextPage?.url))
+             } catch (e2: Exception) {
+                 Result.failure(e)
+             }
         }
     }
 
@@ -233,11 +271,54 @@ class NewPipeHelper @Inject constructor(
     /**
      * Obtener videos de Deportes
      */
-    suspend fun getSportsVideos(): Result<List<Video>> = withContext(Dispatchers.IO) {
+    private suspend fun getKioskVideos(kioskId: String): Result<List<Video>> = withContext(Dispatchers.IO) {
         try {
-            val searchResults = searchVideos("sports highlights soccer football basketball")
+            val kioskList = ServiceList.YouTube.kioskList
+             if (contentCountry.isNotEmpty()) {
+                try {
+                    kioskList.forceContentCountry(org.schabi.newpipe.extractor.localization.ContentCountry(contentCountry))
+                } catch (e: Exception) {
+                     // ignore
+                }
+            }
+            val extractor = kioskList.getExtractorById(kioskId, null)
+            extractor.fetchPage()
+            val info = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(extractor)
+            
+            val videos = info.relatedItems
+                .filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>()
+                .map { item ->
+                    Video(
+                        url = item.url,
+                        title = item.name,
+                        thumbnail = item.thumbnails.maxByOrNull { it.height }?.url ?: "",
+                        uploaderName = item.uploaderName ?: "",
+                        uploaderUrl = item.uploaderUrl,
+                        uploaderAvatar = item.uploaderAvatars.maxByOrNull { it.height }?.url,
+                        uploadedDate = item.uploadDate?.offsetDateTime()?.toString(),
+                        duration = item.duration,
+                        views = item.viewCount,
+                        uploaderVerified = item.isUploaderVerified,
+                        isShort = item.duration > 0 && item.duration < 60,
+                        isLive = item.streamType == StreamType.LIVE_STREAM
+                    )
+                }
+            Result.success(videos)
+        } catch (e: Exception) {
+            android.util.Log.e("NewPipeHelper", "Error fetching kiosk $kioskId", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Obtener videos de Deportes
+     */
+    suspend fun getSportsVideos(): Result<List<Video>> = withContext(Dispatchers.IO) {
+        // Fallback to search for Sports as there isn't a reliable "Sports" kiosk ID across all regions/instances
+        try {
+            val searchResults = searchVideos("sports highlights")
             searchResults.getOrNull()?.take(30)?.let { videos ->
-                Result.success(videos.filter { it.views > 10000 })
+                Result.success(videos)
             } ?: Result.failure(Exception("No se pudieron cargar videos de deportes"))
         } catch (e: Exception) {
             Result.failure(e)
@@ -247,45 +328,37 @@ class NewPipeHelper @Inject constructor(
     /**
      * Obtener videos de Gaming
      */
-    suspend fun getGamingVideos(): Result<List<Video>> = withContext(Dispatchers.IO) {
-        try {
-            // Buscar videos de gaming populares
-            val searchResults = searchVideos("gaming highlights gameplay")
-            searchResults.getOrNull()?.take(30)?.let { videos ->
-                Result.success(videos.filter { it.views > 10000 })
-            } ?: Result.failure(Exception("No se pudieron cargar videos de gaming"))
-        } catch (e: Exception) {
-            Result.failure(e)
+    suspend fun getGamingVideos(): Result<List<Video>> {
+        // Try reliable kiosk IDs. 
+        // Note: NewPipe Extractor specific IDs: "Gaming" (old), "trending_gaming" (new)
+        // We try "trending_gaming" first as per LibreTube
+        return getKioskVideos("trending_gaming").recoverCatching {
+            getKioskVideos("Gaming").getOrThrow()
+        }.recoverCatching {
+             // Fallback to search
+             searchVideos("gaming trending").getOrThrow()
         }
     }
     
     /**
      * Obtener videos de Música
      */
-    suspend fun getMusicVideos(): Result<List<Video>> = withContext(Dispatchers.IO) {
-        try {
-            // Buscar videos musicales populares
-            val searchResults = searchVideos("music video official")
-            searchResults.getOrNull()?.take(30)?.let { videos ->
-                Result.success(videos.filter { it.views > 10000 })
-            } ?: Result.failure(Exception("No se pudieron cargar videos de música"))
-        } catch (e: Exception) {
-            Result.failure(e)
+    suspend fun getMusicVideos(): Result<List<Video>> {
+         // Try "trending_music" or "Music"
+        return getKioskVideos("trending_music").recoverCatching {
+             getKioskVideos("Music").getOrThrow()
+        }.recoverCatching {
+             searchVideos("music trending").getOrThrow()
         }
     }
     
     /**
      * Obtener videos en vivo
      */
-    suspend fun getLiveVideos(): Result<List<Video>> = withContext(Dispatchers.IO) {
-        try {
-            val searchResults = searchVideos("live")
-            searchResults.getOrNull()?.let { videos ->
-                // Filtrar solo videos en vivo
-                Result.success(videos.filter { it.isLive })
-            } ?: Result.failure(Exception("No se pudieron cargar videos en vivo"))
-        } catch (e: Exception) {
-            Result.failure(e)
+    suspend fun getLiveVideos(): Result<List<Video>> {
+        // Kiosk "live" usually works
+        return getKioskVideos("live").recoverCatching {
+             searchVideos("live now").map { list -> list.filter { it.isLive } }.getOrThrow()
         }
     }
     

@@ -3,6 +3,7 @@ package com.opentube.data.repository
 import com.opentube.data.api.PipedApiService
 import com.opentube.data.extractor.NewPipeHelper
 import com.opentube.data.models.*
+import com.opentube.data.models.Segment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -295,10 +296,10 @@ class VideoRepository @Inject constructor(
                         uploaderName = video.uploaderName,
                         uploaderUrl = video.uploaderUrl,
                         uploaderAvatar = video.uploaderAvatar,
+                        uploaderVerified = video.uploaderVerified,
                         uploadedDate = video.uploadedDate,
                         duration = video.duration,
                         views = video.views,
-                        uploaderVerified = video.uploaderVerified,
                         description = "",
                         subscribers = null,
                         videos = null,
@@ -388,6 +389,15 @@ class VideoRepository @Inject constructor(
             // Convertir los comentarios de NewPipe a nuestro modelo
             val comments = commentsInfo.relatedItems.mapNotNull { commentInfo ->
                 try {
+                    // Serializar la página de respuestas si existe
+                    val repliesPageSerialized = try {
+                        commentInfo.replies?.let { repliesPage ->
+                            com.opentube.data.extractor.PagedResult.serializePage(repliesPage)
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    
                     com.opentube.ui.screens.player.Comment(
                         id = commentInfo.commentId ?: "",
                         author = commentInfo.uploaderName ?: "Usuario desconocido",
@@ -396,7 +406,8 @@ class VideoRepository @Inject constructor(
                         likes = commentInfo.likeCount.toLong(),
                         publishedTime = formatCommentDate(commentInfo.uploadDate),
                         isVerified = commentInfo.isUploaderVerified,
-                        replyCount = commentInfo.replyCount
+                        replyCount = commentInfo.replyCount,
+                        repliesPage = repliesPageSerialized
                     )
                 } catch (e: Exception) {
                     android.util.Log.e("VideoRepository", "Error parsing comment", e)
@@ -448,6 +459,74 @@ class VideoRepository @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("VideoRepository", "Error formatting comment date", e)
             return ""
+        }
+    }
+    /**
+     * Get SponsorBlock segments
+     */
+    fun getSegments(videoId: String): Flow<Result<List<Segment>>> = flow {
+        try {
+            val segmentData = pipedApi.getSegments(videoId)
+            emit(Result.success(segmentData.segments))
+        } catch (e: Exception) {
+            // It's okay if it fails (404 usually means no segments)
+            emit(Result.success(emptyList()))
+        }
+    }
+    
+    /**
+     * Get comment replies using the serialized Page
+     */
+    fun getCommentReplies(videoId: String, serializedPage: String): Flow<Result<List<com.opentube.ui.screens.player.Comment>>> = flow {
+        try {
+            val page = com.opentube.data.extractor.PagedResult.deserializePage(serializedPage)
+            if (page == null) {
+                emit(Result.failure(Exception("Invalid page data")))
+                return@flow
+            }
+            
+            val url = "https://www.youtube.com/watch?v=$videoId"
+            val repliesInfo = withContext(Dispatchers.IO) {
+                try {
+                    org.schabi.newpipe.extractor.comments.CommentsInfo.getMoreItems(
+                        org.schabi.newpipe.extractor.ServiceList.YouTube,
+                        url,
+                        page
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoRepository", "Error getting comment replies", e)
+                    null
+                }
+            }
+            
+            if (repliesInfo == null) {
+                emit(Result.success(emptyList()))
+                return@flow
+            }
+            
+            val replies = repliesInfo.items.mapNotNull { replyInfo ->
+                try {
+                    com.opentube.ui.screens.player.Comment(
+                        id = replyInfo.commentId ?: "",
+                        author = replyInfo.uploaderName ?: "Usuario desconocido",
+                        authorAvatar = replyInfo.uploaderAvatars.firstOrNull()?.url ?: "",
+                        text = replyInfo.commentText?.content ?: "",
+                        likes = replyInfo.likeCount.toLong(),
+                        publishedTime = formatCommentDate(replyInfo.uploadDate),
+                        isVerified = replyInfo.isUploaderVerified,
+                        replyCount = 0, // Replies don't have nested replies
+                        repliesPage = null
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("VideoRepository", "Error parsing reply", e)
+                    null
+                }
+            }
+            
+            emit(Result.success(replies))
+        } catch (e: Exception) {
+            android.util.Log.e("VideoRepository", "Error fetching replies", e)
+            emit(Result.success(emptyList()))
         }
     }
 }

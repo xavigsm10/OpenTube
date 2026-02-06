@@ -27,12 +27,15 @@ import com.opentube.data.models.AudioStream
 import com.opentube.data.models.VideoStream
 import com.opentube.data.models.SubtitleStream
 
+import androidx.compose.material.icons.filled.Timer
+
 enum class SettingsTab {
     MAIN,
     QUALITY,
     SPEED,
     AUDIO,
-    SUBTITLES
+    SUBTITLES,
+    SLEEP_TIMER
 }
 
 @Composable
@@ -50,6 +53,7 @@ fun PlayerSettingsSheet(
     onAudioSelected: (AudioStream) -> Unit,
     onSubtitleSelected: (SubtitleStream?) -> Unit,
     onSpeedSelected: (Float) -> Unit,
+    onSleepTimerSelected: (Long) -> Unit = {}, // New parameter with default for backward compatibility
     onSubtitlesToggle: () -> Unit,
     onMusicModeToggle: () -> Unit,
     onDismiss: () -> Unit,
@@ -76,9 +80,10 @@ fun PlayerSettingsSheet(
                     text = when (currentTab) {
                         SettingsTab.MAIN -> "Configuración"
                         SettingsTab.QUALITY -> "Calidad"
-                        SettingsTab.SPEED -> "Velocidad de reproducción"
+                        SettingsTab.SPEED -> "Velocidad"
                         SettingsTab.AUDIO -> "Pista de audio"
                         SettingsTab.SUBTITLES -> "Subtítulos"
+                        SettingsTab.SLEEP_TIMER -> "Temporizador"
                     },
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
@@ -97,6 +102,7 @@ fun PlayerSettingsSheet(
                         onSpeedClick = { currentTab = SettingsTab.SPEED },
                         onAudioClick = { currentTab = SettingsTab.AUDIO },
                         onSubtitlesClick = { currentTab = SettingsTab.SUBTITLES },
+                        onSleepTimerClick = { currentTab = SettingsTab.SLEEP_TIMER },
                         musicModeEnabled = musicModeEnabled,
                         onMusicModeClick = {
                             onMusicModeToggle()
@@ -147,6 +153,15 @@ fun PlayerSettingsSheet(
                         },
                         onBack = { currentTab = SettingsTab.MAIN }
                     )
+
+                    SettingsTab.SLEEP_TIMER -> SleepTimerSettings(
+                        onTimerSelected = {
+                            onSleepTimerSelected(it)
+                            currentTab = SettingsTab.MAIN
+                            onDismiss()
+                        },
+                        onBack = { currentTab = SettingsTab.MAIN }
+                    )
                 }
             }
         }
@@ -164,6 +179,7 @@ private fun MainSettings(
     onSpeedClick: () -> Unit,
     onAudioClick: () -> Unit,
     onSubtitlesClick: () -> Unit,
+    onSleepTimerClick: () -> Unit,
     onMusicModeClick: () -> Unit
 ) {
     LazyColumn(
@@ -191,6 +207,15 @@ private fun MainSettings(
         
         item {
             SettingsItem(
+                icon = Icons.Default.Timer,
+                title = "Temporizador",
+                subtitle = "Apagado",
+                onClick = onSleepTimerClick
+            )
+        }
+        
+        item {
+            SettingsItem(
                 icon = Icons.Default.GraphicEq,
                 title = "Pista de audio",
                 subtitle = "Audio principal",
@@ -204,6 +229,39 @@ private fun MainSettings(
                 title = "Subtítulos",
                 subtitle = if (subtitlesEnabled) currentSubtitleTrack?.language ?: "Activados" else "Desactivados",
                 onClick = onSubtitlesClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun SleepTimerSettings(
+    onTimerSelected: (Long) -> Unit,
+    onBack: () -> Unit
+) {
+    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        item {
+            SettingsItem(
+                icon = Icons.Default.ArrowBack,
+                title = "Volver",
+                onClick = onBack
+            )
+            Divider()
+        }
+        
+        val options = listOf(
+            -1L to "Apagado",
+            15L to "15 minutos",
+            30L to "30 minutos",
+            60L to "1 hora",
+            -2L to "Fin del video"
+        )
+        
+        items(options) { (value, label) ->
+            SelectableSettingsItem(
+                title = label,
+                isSelected = false, // TODO: Check actual state
+                onClick = { onTimerSelected(value) }
             )
         }
     }
@@ -287,6 +345,64 @@ private fun AudioSettings(
     onAudioSelected: (AudioStream) -> Unit,
     onBack: () -> Unit
 ) {
+    // Helper function to get display name for audio track
+    fun getAudioTrackDisplayName(stream: AudioStream): String {
+        // Try to get the language from audioTrackId (usually contains language code like "es.1", "en.1")
+        val languageCode = stream.audioTrackId?.split(".")?.firstOrNull()?.take(2)
+        
+        // Convert language code to readable name
+        val languageName = when (languageCode?.lowercase()) {
+            "es" -> "Español"
+            "en" -> "English"
+            "pt" -> "Português"
+            "fr" -> "Français"
+            "de" -> "Deutsch"
+            "it" -> "Italiano"
+            "ja" -> "日本語"
+            "ko" -> "한국어"
+            "zh" -> "中文"
+            "ru" -> "Русский"
+            "ar" -> "العربية"
+            "hi" -> "हिन्दी"
+            "tr" -> "Türkçe"
+            "nl" -> "Nederlands"
+            "pl" -> "Polski"
+            "sv" -> "Svenska"
+            "da" -> "Dansk"
+            "no" -> "Norsk"
+            "fi" -> "Suomi"
+            "el" -> "Ελληνικά"
+            "he" -> "עברית"
+            "th" -> "ไทย"
+            "vi" -> "Tiếng Việt"
+            "id" -> "Bahasa Indonesia"
+            "ms" -> "Bahasa Melayu"
+            else -> null
+        }
+        
+        // Try audioTrackName if language not found
+        val trackName = stream.audioTrackName
+        
+        return when {
+            !languageName.isNullOrEmpty() -> languageName
+            !trackName.isNullOrEmpty() && !trackName.contains("Opus", ignoreCase = true) && 
+                !trackName.contains("WebM", ignoreCase = true) && !trackName.contains("mp4a", ignoreCase = true) -> trackName
+            else -> "Audio principal"
+        }
+    }
+    
+    fun getAudioTrackSubtitle(stream: AudioStream): String {
+        val bitrate = stream.bitrate?.let { "${it / 1000} kbps" } ?: ""
+        val format = when {
+            stream.mimeType.contains("opus", ignoreCase = true) -> "Opus"
+            stream.mimeType.contains("aac", ignoreCase = true) -> "AAC"
+            stream.mimeType.contains("mp4a", ignoreCase = true) -> "AAC"
+            stream.mimeType.contains("vorbis", ignoreCase = true) -> "Vorbis"
+            else -> stream.format
+        }
+        return if (bitrate.isNotEmpty()) "$format • $bitrate" else format
+    }
+
     LazyColumn(modifier = Modifier.fillMaxWidth()) {
         item {
             SettingsItem(
@@ -297,16 +413,25 @@ private fun AudioSettings(
             Divider()
         }
         
-        items(audioStreams) { audioStream ->
+        // Group audio streams by language/track to avoid duplicates
+        val groupedStreams = audioStreams
+            .groupBy { getAudioTrackDisplayName(it) }
+            .map { (name, streams) -> 
+                // Pick the highest quality stream from each language group
+                name to streams.maxByOrNull { it.bitrate ?: 0 }!!
+            }
+        
+        items(groupedStreams) { (displayName, audioStream) ->
             SelectableSettingsItem(
-                title = audioStream.audioTrackName ?: "Audio principal",
-                subtitle = "${audioStream.format} • ${audioStream.quality}",
+                title = displayName,
+                subtitle = getAudioTrackSubtitle(audioStream),
                 isSelected = currentAudioTrack?.url == audioStream.url,
                 onClick = { onAudioSelected(audioStream) }
             )
         }
     }
 }
+
 
 @Composable
 private fun SubtitlesSettings(

@@ -19,19 +19,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.opentube.R
-import com.opentube.data.models.SearchItem
 import com.opentube.ui.components.VideoCard
 import com.opentube.data.models.Video
 
+import androidx.compose.ui.ExperimentalComposeUiApi
+
 /**
- * Search screen
+ * Search screen with Paging 3 (Infinite Scrolling)
+ * Implements behavior similar to LibreTube
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
@@ -39,13 +45,19 @@ fun SearchScreen(
     onChannelClick: (String) -> Unit,
     viewModel: SearchViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val searchResultsFlow by viewModel.searchResults.collectAsState()
+    val pagingItems = searchResultsFlow.collectAsLazyPagingItems()
+    
     val searchQuery by viewModel.searchQuery.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val searchHistory by viewModel.searchHistory.collectAsState()
+    
     val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     var showSuggestions by remember { mutableStateOf(false) }
     
+    // Request focus only when first entering the screen
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
@@ -72,6 +84,8 @@ fun SearchScreen(
                             onSearch = {
                                 viewModel.search()
                                 showSuggestions = false
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
                             }
                         ),
                         colors = TextFieldDefaults.colors(
@@ -102,6 +116,8 @@ fun SearchScreen(
                         onClick = {
                             viewModel.search()
                             showSuggestions = false
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
                         },
                         enabled = searchQuery.isNotEmpty()
                     ) {
@@ -109,7 +125,8 @@ fun SearchScreen(
                     }
                 }
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0.dp)
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -117,29 +134,27 @@ fun SearchScreen(
                 .padding(paddingValues)
         ) {
             when {
+                // SUGGESTIONS STATE
                 showSuggestions && suggestions.isNotEmpty() -> {
-                    // Mostrar sugerencias
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(suggestions) { suggestion ->
                             ListItem(
                                 headlineContent = { Text(suggestion) },
-                                leadingContent = {
-                                    Icon(Icons.Default.Search, contentDescription = null)
-                                },
+                                leadingContent = { Icon(Icons.Default.Search, contentDescription = null) },
                                 modifier = Modifier.clickable {
                                     viewModel.updateSearchQuery(suggestion)
                                     viewModel.search(suggestion)
                                     showSuggestions = false
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
                                 }
                             )
                         }
                     }
                 }
                 
-                uiState is SearchUiState.Idle && searchHistory.isNotEmpty() -> {
-                    // Mostrar historial de búsqueda con tarjetas Material 3
+                // HISTORY STATE
+                searchQuery.isEmpty() && searchHistory.isNotEmpty() -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
@@ -158,48 +173,30 @@ fun SearchScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                
                                 TextButton(onClick = { viewModel.clearHistory() }) {
-                                    Icon(
-                                        Icons.Default.DeleteSweep,
-                                        contentDescription = "Limpiar historial",
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Limpiar")
                                 }
                             }
                         }
-                        
-                        items(
-                            items = searchHistory,
-                            key = { it.query }
-                        ) { historyItem ->
+                        items(searchHistory) { historyItem ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = {
                                     viewModel.updateSearchQuery(historyItem.query)
                                     viewModel.search(historyItem.query)
                                     showSuggestions = false
+                                    keyboardController?.hide()
+                                    focusManager.clearFocus()
                                 }
                             ) {
                                 ListItem(
                                     headlineContent = { Text(historyItem.query) },
-                                    leadingContent = {
-                                        Icon(
-                                            Icons.Default.History,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.secondary
-                                        )
-                                    },
+                                    leadingContent = { Icon(Icons.Default.History, contentDescription = null) },
                                     trailingContent = {
-                                        IconButton(
-                                            onClick = { viewModel.removeFromHistory(historyItem.query) }
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = "Eliminar"
-                                            )
+                                        IconButton(onClick = { viewModel.removeFromHistory(historyItem.query) }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Eliminar")
                                         }
                                     }
                                 )
@@ -208,116 +205,97 @@ fun SearchScreen(
                     }
                 }
                 
-                uiState is SearchUiState.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                
-                uiState is SearchUiState.Success -> {
-                    val state = uiState as SearchUiState.Success
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(
-                            items = state.results,
-                            key = { it.url }
-                        ) { item ->
-                            when (item.type) {
-                                "stream" -> {
-                                    val video = Video(
-                                        url = item.url,
-                                        title = item.title ?: "",
-                                        thumbnail = item.thumbnail,
-                                        uploaderName = item.uploaderName ?: "",
-                                        uploaderUrl = item.uploaderUrl,
-                                        uploaderAvatar = item.uploaderAvatar,
-                                        uploadedDate = item.uploadedDate,
-                                        duration = item.duration ?: 0,
-                                        views = item.views ?: 0,
-                                        uploaderVerified = item.uploaderVerified ?: false
-                                    )
+                // RESULTS STATE (Paging)
+                else -> {
+                    if (pagingItems.itemCount > 0 || pagingItems.loadState.refresh is LoadState.Loading) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(pagingItems.itemCount) { index ->
+                                val video = pagingItems[index]
+                                if (video != null) {
                                     VideoCard(
                                         video = video,
                                         onClick = { onVideoClick(video.videoId) }
                                     )
                                 }
-                                "channel" -> {
-                                    // Channel item (simplified)
-                                    ListItem(
-                                        headlineContent = { Text(item.name ?: "") },
-                                        supportingContent = {
-                                            Text("${item.subscribers ?: 0} suscriptores")
-                                        },
-                                        modifier = Modifier.clickable {
-                                            item.url.substringAfterLast("/").let { channelId ->
-                                                onChannelClick(channelId)
-                                            }
+                            }
+                            
+                            // 2. Append Loading State (Small loader at the end)
+                            when (pagingItems.loadState.append) {
+                                is LoadState.Loading -> {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(32.dp),
+                                                strokeWidth = 3.dp
+                                            )
                                         }
+                                    }
+                                }
+                                is LoadState.Error -> {
+                                    item {
+                                        Button(
+                                            onClick = { pagingItems.retry() },
+                                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
+                                        ) {
+                                            Text("Error al cargar más. Reintentar")
+                                        }
+                                    }
+                                }
+                                else -> {}
+                            }
+                        }
+                    }
+                    
+                    // 1. Initial Loading State (Centered loader)
+                    // 3. Retry Button (Initial Error)
+                    when (pagingItems.loadState.refresh) {
+                        is LoadState.Loading -> {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                        is LoadState.Error -> {
+                            val e = pagingItems.loadState.refresh as LoadState.Error
+                            Column(
+                                Modifier.fillMaxSize().padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "Error: ${e.error.localizedMessage ?: "Unknown Error"}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                Button(onClick = { pagingItems.retry() }) {
+                                    Text("Reintentar")
+                                }
+                            }
+                        }
+                        else -> {
+                            if (pagingItems.itemCount == 0 && searchQuery.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "No se encontraron resultados",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                         }
-                        
-                        if (state.hasMore) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
-                                    
-                                    // Trigger load more when this item becomes visible
-                                    LaunchedEffect(Unit) {
-                                        viewModel.loadMore()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                uiState is SearchUiState.Error -> {
-                    val state = uiState as SearchUiState.Error
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-                
-                else -> {
-                    // Idle state - show prompt
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Busca videos, canales y playlists",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
                     }
                 }
             }

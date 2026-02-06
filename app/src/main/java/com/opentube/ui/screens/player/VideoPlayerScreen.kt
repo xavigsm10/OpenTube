@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -43,6 +44,7 @@ import com.opentube.ui.screens.player.components.MetrolistMusicPlayer
 import androidx.media3.ui.PlayerView
 import com.opentube.ui.screens.player.components.PlayerControls
 import com.opentube.ui.screens.player.components.PlayerSettingsSheet
+import com.opentube.ui.screens.player.components.PlayerGestureOverlay
 import com.opentube.ui.components.VideoCard
 import com.opentube.helpers.DashHelper
 import com.opentube.util.PictureInPictureUtil
@@ -385,6 +387,11 @@ fun VideoPlayerScreen(
                                 android.util.Log.e("VideoPlayerScreen", "Error setting playback speed", e)
                             }
                             
+                            // Notificar al ViewModel que la reproducción ha comenzado para este video
+                            if (streamLoaded) {
+                                viewModel.onPlaybackStarted()
+                            }
+                            
                         } catch (e: Exception) {
                             android.util.Log.e("VideoPlayerScreen", "❌ Fatal error loading stream", e)
                             e.printStackTrace()
@@ -482,10 +489,22 @@ fun VideoPlayerScreen(
                 }
             }
             
+            // Get status bar height for proper padding in portrait mode
+            val statusBarInsets = androidx.compose.foundation.layout.WindowInsets.statusBars
+            val statusBarHeight = statusBarInsets.asPaddingValues().calculateTopPadding()
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background)
+                    .then(
+                        if (!isFullscreen) {
+                            // En portrait, agregar padding superior para la status bar
+                            Modifier.padding(top = statusBarHeight)
+                        } else {
+                            Modifier
+                        }
+                    )
             ) {
                 // Video player
                 Box(
@@ -502,69 +521,26 @@ fun VideoPlayerScreen(
                             }
                         )
                         .background(androidx.compose.ui.graphics.Color.Black)
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                if (zoom > 1.1f) {
-                                    // Zoom in -> Fill
-                                    viewModel.setResizeMode(1) // FILL
-                                } else if (zoom < 0.9f) {
-                                    // Zoom out -> Fit
-                                    viewModel.setResizeMode(0) // FIT
-                                }
-                            }
-                        }
-                        .pointerInput(Unit) {
-                                                        detectVerticalDragGestures(
-                                onDragEnd = {
-                                    // Si desliza más de 200px hacia abajo, minimizar
-                                    if (dragOffsetY > 200f && !isFullscreen) {
-                                        val state = uiState
-                                        if (state is VideoPlayerUiState.Success && onMinimize != null) {
-                                            // Marcar que estamos minimizando
-                                            isMinimizing = true
-                                            onMinimize(
-                                                state.videoDetails.title,
-                                                state.videoDetails.uploader,
-                                                state.videoDetails.thumbnailUrl,
-                                                isPlaying,
-                                                exoPlayer
-                                            )
-                                            // Navegar hacia atrás DESPUÉS de minimizar
-                                            onNavigateBack()
-                                        }
-                                    }
-                                    // Reset drag offset con animación
-                                    dragOffsetY = 0f
-                                },
-                                onVerticalDrag = { _, dragAmount ->
-                                    if (!isFullscreen) {
-                                        // Solo permitir drag hacia abajo
-                                        dragOffsetY = (dragOffsetY + dragAmount).coerceAtLeast(0f).coerceAtMost(300f)
-                                    }
-                                }
-                            )
-                        }
-                        .offset(y = dragOffsetY.dp)
-                        .graphicsLayer {
-                            // Reducir escala ligeramente mientras se arrastra
-                            val scale = 1f - (dragOffsetY / 1000f).coerceIn(0f, 0.1f)
-                            scaleX = scale
-                            scaleY = scale
-                            // Reducir opacidad ligeramente
-                            alpha = 1f - (dragOffsetY / 800f).coerceIn(0f, 0.3f)
-                        }
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            showControls = !showControls
-                        }
                 ) {
-                    // ExoPlayer view
-                    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
-                    
                     // Obtener el resize mode del estado
                     val resizeMode = (uiState as? VideoPlayerUiState.Success)?.playerSettings?.resizeMode ?: 0
+
+                    PlayerGestureOverlay(
+                        onSingleTap = { showControls = !showControls },
+                        onDoubleTapSeek = { seconds ->
+                            exoPlayer?.seekTo((exoPlayer.currentPosition + seconds * 1000).coerceIn(0, exoPlayer.duration))
+                        },
+                        onVolumeChange = { /* Handled internally */ },
+                        onBrightnessChange = { value ->
+                            val lp = activity?.window?.attributes
+                            if (lp != null) {
+                                lp.screenBrightness = value
+                                activity.window?.attributes = lp
+                            }
+                        }
+                    ) {
+                    // ExoPlayer view
+                    var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
                     
                     // Forzar resize mode continuamente para prevenir cambios automáticos
                     LaunchedEffect(exoPlayer, isFullscreen, resizeMode) {
@@ -660,6 +636,7 @@ fun VideoPlayerScreen(
                             .fillMaxSize()
                             .fillMaxSize()
                     )
+                    }
 
                     // Controles personalizados
                     PlayerControls(
@@ -769,20 +746,27 @@ fun VideoPlayerScreen(
                             CommentsSection(
                                 comments = state.comments,
                                 isLoading = state.isLoadingComments,
-                                onLoadMore = { viewModel.loadMoreComments() }
+                                onLoadMore = { viewModel.loadMoreComments() },
+                                onLoadReplies = { commentId, repliesPage ->
+                                    viewModel.loadReplies(commentId, repliesPage)
+                                },
+                                replies = state.replies,
+                                loadingReplies = state.loadingReplies
                             )
                         }
                         
                         // Related videos
                         item {
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Videos relacionados",
+                                text = "A continuación",
                                 style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
                         
-                        items(videoDetails.relatedStreams) { relatedVideo ->
+                        items(videoDetails.relatedStreams.take(20)) { relatedVideo ->
                             VideoCard(
                                 video = relatedVideo,
                                 onClick = { 

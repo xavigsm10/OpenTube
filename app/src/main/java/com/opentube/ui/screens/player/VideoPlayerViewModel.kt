@@ -39,7 +39,9 @@ sealed interface VideoPlayerUiState {
         val isSubscribed: Boolean = false,
         val currentPosition: Long = 0,
         val comments: List<Comment> = emptyList(),
-        val isLoadingComments: Boolean = false
+        val isLoadingComments: Boolean = false,
+        val replies: Map<String, List<Comment>> = emptyMap(), // commentId -> replies
+        val loadingReplies: Set<String> = emptySet() // Set of comment IDs currently loading replies
     ) : VideoPlayerUiState
     data class Error(val message: String) : VideoPlayerUiState
 }
@@ -71,6 +73,9 @@ class VideoPlayerViewModel @Inject constructor(
         if (playerManager.currentVideoId.value == videoId && playerManager.cachedVideoDetails != null) {
             android.util.Log.d("VideoPlayerViewModel", "Using cached video details - seamless transition!")
             val cachedDetails = playerManager.cachedVideoDetails!!
+            
+            // Ensure videoId is set (should be already, but for safety)
+            playerManager.setVideoId(videoId)
             
             // Immediately set success state with cached details
             _uiState.value = VideoPlayerUiState.Success(
@@ -110,12 +115,26 @@ class VideoPlayerViewModel @Inject constructor(
                         onSuccess = { details ->
                             try {
                                 android.util.Log.d("VideoPlayerViewModel", "Video details loaded successfully")
+                                
+                                // Fetch SponsorBlock segments
+                                viewModelScope.launch {
+                                    videoRepository.getSegments(videoId).collect { result ->
+                                        result.onSuccess { loadedSegments ->
+                                            segments = loadedSegments
+                                            startSponsorBlockMonitor()
+                                        }
+                                    }
+                                }
+
                                 android.util.Log.d("VideoPlayerViewModel", "HLS URL: ${details.hlsUrl ?: "null"}")
                                 android.util.Log.d("VideoPlayerViewModel", "Video streams: ${details.videoStreams.size}")
                                 android.util.Log.d("VideoPlayerViewModel", "Audio streams: ${details.audioStreams.size}")
                                 
                                 // Cache the details for future transitions
                                 playerManager.cacheVideoDetails(details)
+                                // Cache the details for future transitions
+                                playerManager.cacheVideoDetails(details)
+                                // playerManager.setVideoId(videoId) - Moved to onPlaybackStarted
                                 
                                 // Guardar en historial
                                 saveToHistory(details)
@@ -398,7 +417,76 @@ class VideoPlayerViewModel @Inject constructor(
         android.util.Log.d("VideoPlayerViewModel", "loadMoreComments() not implemented yet")
     }
     
+    fun loadReplies(commentId: String, repliesPage: String) {
+        val state = _uiState.value
+        if (state !is VideoPlayerUiState.Success) return
+        
+        // Don't reload if already loaded or loading
+        if (state.replies.containsKey(commentId) || state.loadingReplies.contains(commentId)) return
+        
+        viewModelScope.launch {
+            // Set loading state
+            _uiState.value = state.copy(
+                loadingReplies = state.loadingReplies + commentId
+            )
+            
+            videoRepository.getCommentReplies(videoId, repliesPage).collect { result ->
+                val currentState = _uiState.value
+                if (currentState is VideoPlayerUiState.Success) {
+                    result.fold(
+                        onSuccess = { repliesList ->
+                            android.util.Log.d("VideoPlayerViewModel", "Loaded ${repliesList.size} replies for comment $commentId")
+                            _uiState.value = currentState.copy(
+                                replies = currentState.replies + (commentId to repliesList),
+                                loadingReplies = currentState.loadingReplies - commentId
+                            )
+                        },
+                        onFailure = { exception ->
+                            android.util.Log.e("VideoPlayerViewModel", "Error loading replies", exception)
+                            _uiState.value = currentState.copy(
+                                loadingReplies = currentState.loadingReplies - commentId
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+    
     fun isCurrentVideo(checkVideoId: String): Boolean {
         return playerManager.currentVideoId.value == checkVideoId
+    }
+
+    // SponsorBlock Logic
+    private var segments: List<com.opentube.data.models.Segment> = emptyList()
+    private var sponsorBlockJob: kotlinx.coroutines.Job? = null
+
+    private fun startSponsorBlockMonitor() {
+        sponsorBlockJob?.cancel()
+        sponsorBlockJob = viewModelScope.launch {
+            while (true) {
+                if (player.isPlaying) {
+                    val currentPos = player.currentPosition
+                    com.opentube.player.PlayerHelper.getCurrentSegment(currentPos, segments)?.let { segment ->
+                        // Skip segment
+                        player.seekTo((segment.end * 1000).toLong())
+                        segment.skipped = true
+                        
+                        // Show toast or message (optional)
+                        android.util.Log.d("SponsorBlock", "Skipped segment: ${segment.category}")
+                    }
+                }
+                kotlinx.coroutines.delay(500) // Check every 500ms
+            }
+        }
+    }
+
+    fun onPlaybackStarted() {
+        playerManager.setVideoId(videoId)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        sponsorBlockJob?.cancel()
     }
 }

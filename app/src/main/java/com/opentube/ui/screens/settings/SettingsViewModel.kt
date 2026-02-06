@@ -33,7 +33,10 @@ data class AppSettings(
     val musicModeEnabled: Boolean = false,
     val contentLanguage: String = "es",
     val contentCountry: String = "ES",
-    val materialYouEnabled: Boolean = true
+    val materialYouEnabled: Boolean = true,
+    val instanceApiUrl: String = "https://pipedapi.adminforge.de/",
+    val fullLocalMode: Boolean = false,
+    val localStreamExtraction: Boolean = true
 )
 
 enum class ThemeMode {
@@ -66,6 +69,9 @@ class SettingsViewModel @Inject constructor(
         val CONTENT_LANGUAGE = stringPreferencesKey("content_language")
         val CONTENT_COUNTRY = stringPreferencesKey("content_country")
         val MATERIAL_YOU_ENABLED = booleanPreferencesKey("material_you_enabled")
+        val INSTANCE_API_URL = stringPreferencesKey("instance_api_url")
+        val FULL_LOCAL_MODE = booleanPreferencesKey("full_local_mode")
+        val LOCAL_STREAM_EXTRACTION = booleanPreferencesKey("local_stream_extraction")
     }
     
     val settings: StateFlow<AppSettings> = context.dataStore.data
@@ -83,7 +89,10 @@ class SettingsViewModel @Inject constructor(
                 musicModeEnabled = preferences[PreferencesKeys.MUSIC_MODE_ENABLED] ?: false,
                 contentLanguage = preferences[PreferencesKeys.CONTENT_LANGUAGE] ?: "es",
                 contentCountry = preferences[PreferencesKeys.CONTENT_COUNTRY] ?: "ES",
-                materialYouEnabled = preferences[PreferencesKeys.MATERIAL_YOU_ENABLED] ?: true
+                materialYouEnabled = preferences[PreferencesKeys.MATERIAL_YOU_ENABLED] ?: true,
+                instanceApiUrl = preferences[PreferencesKeys.INSTANCE_API_URL] ?: "https://pipedapi.adminforge.de/",
+                fullLocalMode = preferences[PreferencesKeys.FULL_LOCAL_MODE] ?: false,
+                localStreamExtraction = preferences[PreferencesKeys.LOCAL_STREAM_EXTRACTION] ?: true
             )
         }
         .stateIn(
@@ -182,6 +191,16 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
+    
+    fun setInstanceApiUrl(url: String) {
+        viewModelScope.launch {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.INSTANCE_API_URL] = url
+            }
+        }
+        // Force app restart or re-init might be stored in a separate mechanism, 
+        // but updating DataStore is enough for now as InstancePreferences reads from it.
+    }
 
     fun setMaterialYouEnabled(enabled: Boolean) {
         viewModelScope.launch {
@@ -190,6 +209,22 @@ class SettingsViewModel @Inject constructor(
                 if (!enabled) {
                     preferences[PreferencesKeys.THEME] = ThemeMode.YOUTUBE.name
                 }
+            }
+        }
+    }
+
+    fun setFullLocalMode(enabled: Boolean) {
+        viewModelScope.launch {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.FULL_LOCAL_MODE] = enabled
+            }
+        }
+    }
+
+    fun setLocalStreamExtraction(enabled: Boolean) {
+        viewModelScope.launch {
+            context.dataStore.edit { preferences ->
+                preferences[PreferencesKeys.LOCAL_STREAM_EXTRACTION] = enabled
             }
         }
     }

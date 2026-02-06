@@ -1,6 +1,7 @@
 package com.opentube.data.models
 
 import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.Serializable
 
 /**
  * Channel information
@@ -80,9 +81,12 @@ data class SearchResults(
     val corrected: Boolean
 )
 
+
+
 /**
  * Search item (can be video, channel, or playlist)
  */
+@Serializable
 data class SearchItem(
     @SerializedName("url")
     val url: String,

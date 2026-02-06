@@ -213,41 +213,17 @@ fun VideoProgressBar(
     bufferedPosition: Long,
     onSeek: (Long) -> Unit
 ) {
-    var isDragging by remember { mutableStateOf(false) }
-    var dragPosition by remember { mutableStateOf(0L) }
-    
-    val sliderPosition = if (isDragging) dragPosition else currentPosition
-    
-    Box(
+    MarkableProgressBar(
+        currentPosition = currentPosition,
+        duration = duration,
+        bufferedPosition = bufferedPosition,
+        onSeek = onSeek,
+        segments = emptyList(), // Placeholder for future Chapter/SponsorBlock data
         modifier = Modifier
             .fillMaxWidth()
-            .height(18.dp) // Slightly taller to capture touch easily, but visually thin
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { /* Consume clicks */ }
-    ) {
-        Slider(
-            value = sliderPosition.toFloat(),
-            onValueChange = {
-                isDragging = true
-                dragPosition = it.toLong()
-            },
-            onValueChangeFinished = {
-                isDragging = false
-                onSeek(dragPosition)
-            },
-            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-            colors = SliderDefaults.colors(
-                thumbColor = Color(0xFFFF0000), // YouTube Red
-                activeTrackColor = Color(0xFFFF0000),
-                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset(y = 8.dp) // Push down slightly to align with bottom edge
-        )
-    }
+            .padding(bottom = 12.dp)
+            .height(20.dp)
+    )
 }
 
 private fun formatDuration(totalSeconds: Long): String {

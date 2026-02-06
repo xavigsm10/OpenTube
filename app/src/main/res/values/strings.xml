@@ -1,44 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">OpenTube</string>
+    <string name="player_brightness">Brightness</string>
+    <string name="player_volume">Volume</string>
+    <string name="player_seek_fwd">Seek +10s</string>
+    <string name="player_seek_rwd">Seek -10s</string>
+    <string name="player_speed">Playback Speed</string>
+    <string name="player_quality">Quality</string>
+    <string name="player_sleep_timer">Sleep Timer</string>
+    <string name="segment_sponsor">Sponsor</string>
+    <string name="segment_intro">Intro</string>
+    <string name="segment_outro">Outro</string>
+    <string name="chapter_marker">Chapter</string>
+    <string name="action_search">Search</string>
+    <string name="retry">Retry</string>
     
-    <!-- Navigation -->
-    <string name="nav_home">Inicio</string>
-    <string name="nav_trending">Tendencias</string>
-    <string name="nav_subscriptions">Suscripciones</string>
-    <string name="nav_library">Biblioteca</string>
-    <string name="nav_search">Buscar</string>
-    
-    <!-- Actions -->
-    <string name="action_search">Buscar</string>
-    <string name="action_share">Compartir</string>
-    <string name="action_download">Descargar</string>
-    <string name="action_add_to_playlist">Agregar a playlist</string>
-    <string name="action_subscribe">Suscribirse</string>
-    <string name="action_unsubscribe">Desuscribirse</string>
-    
-    <!-- Video Player -->
-    <string name="player_play">Reproducir</string>
-    <string name="player_pause">Pausar</string>
-    <string name="player_next">Siguiente</string>
-    <string name="player_previous">Anterior</string>
-    <string name="player_quality">Calidad</string>
-    <string name="player_speed">Velocidad</string>
-    <string name="player_fullscreen">Pantalla completa</string>
-    
-    <!-- Errors -->
-    <string name="error_loading">Error al cargar</string>
-    <string name="error_network">Error de red</string>
-    <string name="error_no_videos">No hay videos disponibles</string>
-    
-    <!-- Common -->
-    <string name="loading">Cargando…</string>
-    <string name="retry">Reintentar</string>
-    <string name="cancel">Cancelar</string>
-    <string name="ok">Aceptar</string>
-    
-    <!-- Video Info -->
-    <string name="views_count">%1$s visualizaciones</string>
-    <string name="subscribers_count">%1$s suscriptores</string>
-    <string name="video_duration">%1$s</string>
+    <!-- Timer Options -->
+    <string name="timer_off">Off</string>
+    <string name="timer_15_min">15 minutes</string>
+    <string name="timer_30_min">30 minutes</string>
+    <string name="timer_60_min">1 hour</string>
+    <string name="timer_end_video">End of video</string>
 </resources>

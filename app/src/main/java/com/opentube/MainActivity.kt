@@ -12,7 +12,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.opentube.data.local.dataStore
-import com.opentube.ui.screens.settings.AppSettings
 import com.opentube.ui.screens.settings.ThemeMode
 import com.opentube.ui.theme.OpenTubeTheme
 import com.opentube.ui.navigation.OpenTubeNavHost
@@ -49,6 +48,7 @@ class MainActivity : ComponentActivity() {
                 themeMode = themeMode,
                 materialYouEnabled = materialYouEnabled
             ) {
+                // Este Surface es necesario para que el fondo no sea negro/transparente al usar EdgeToEdge
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

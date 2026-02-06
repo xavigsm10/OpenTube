@@ -28,6 +28,14 @@ class NewPipeDownloaderImpl : Downloader() {
             .url(url)
             .addHeader("User-Agent", USER_AGENT)
 
+        // Inject consent cookie for YouTube to avoid GDPR/bot checks
+        if (url.contains("youtube.com")) {
+            val hasConsent = headers["Cookie"]?.any { it.contains("CONSENT") } == true
+            if (!hasConsent) {
+                requestBuilder.addHeader("Cookie", "CONSENT=YES+cb")
+            }
+        }
+
         for ((headerKey, headerValues) in headers) {
             requestBuilder.removeHeader(headerKey)
             for (headerValue in headerValues) {
@@ -57,7 +65,7 @@ class NewPipeDownloaderImpl : Downloader() {
 
     companion object {
         private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
 }
 

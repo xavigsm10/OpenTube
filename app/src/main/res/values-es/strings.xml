@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">OpenTube</string>
+    <string name="player_brightness">Brillo</string>
+    <string name="player_volume">Volumen</string>
+    <string name="player_seek_fwd">Adelantar +10s</string>
+    <string name="player_seek_rwd">Retroceder -10s</string>
+    <string name="player_speed">Velocidad</string>
+    <string name="player_quality">Calidad</string>
+    <string name="player_sleep_timer">Temporizador</string>
+    <string name="segment_sponsor">Patrocinio</string>
+    <string name="segment_intro">Intro</string>
+    <string name="segment_outro">Outro</string>
+    <string name="chapter_marker">Capítulo</string>
+    
+    <!-- Timer Options -->
+    <string name="timer_off">Apagado</string>
+    <string name="timer_15_min">15 minutos</string>
+    <string name="timer_30_min">30 minutos</string>
+    <string name="timer_60_min">1 hora</string>
+    <string name="timer_end_video">Fin del video</string>
+</resources>

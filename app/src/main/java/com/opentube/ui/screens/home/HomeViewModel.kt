@@ -11,12 +11,15 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-/**
- * Categorías disponibles en la pantalla de inicio
- */
 /**
  * Categorías disponibles en la pantalla de inicio
  */
@@ -49,11 +52,18 @@ sealed interface HomeUiState {
  */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val videoRepository: VideoRepository
+    private val videoRepository: VideoRepository,
+    private val instancePreferences: com.opentube.data.local.InstancePreferences
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    
+    val currentRegion = instancePreferences.regionFlow.stateIn(
+        viewModelScope,
+        kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000),
+        "ES"
+    )
     
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -63,6 +73,15 @@ class HomeViewModel @Inject constructor(
     init {
         android.util.Log.d("HomeViewModel", "=== HomeViewModel INIT ===")
         loadContentForCategory(HomeCategory.ALL)
+    }
+
+    fun updateRegion(regionCode: String) {
+        viewModelScope.launch {
+            instancePreferences.setRegion(regionCode)
+            // Wait slightly for NewPipeHelper to pick up the change via DataStore observation
+            kotlinx.coroutines.delay(200) 
+            refresh()
+        }
     }
     
     fun refresh() {
@@ -89,8 +108,6 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = currentState.copy(isLoadingMore = true)
                 
                 // Determine which method to call based on category
-                // Currently only Trending supports pagination via getTrendingPaged
-                // TODO: Implement pagination for other categories
                 if (currentCategory != HomeCategory.ALL && currentCategory != HomeCategory.MUSIC) {
                      videoRepository.getTrendingPaged(currentState.nextPageUrl).collect { result ->
                         result.fold(
@@ -115,43 +132,29 @@ class HomeViewModel @Inject constructor(
     
     private fun loadContentForCategory(category: HomeCategory) {
         android.util.Log.d("HomeViewModel", "loadContentForCategory: ${category.displayName}")
-        viewModelScope.launch {
+        // USAR IO DISPATCHER PARA EVITAR BLOQUEOS (Pantalla Negra)
+        viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = HomeUiState.Loading
-            
-            if (category == HomeCategory.ALL) {
-                loadAllRandomContent()
-            } else if (category == HomeCategory.MUSIC) {
-                loadMusicContent()
-            } else {
-                // Use getTrendingPaged for other categories (Gaming, Sports, Live are currently just filtered searches, 
-                // but for now we'll use Trending as base or implement specific paged searches later)
-                // For simplicity, let's use getTrendingPaged for now if it's not specific
-                
-                // Actually, Gaming/Sports/Live use specific repository methods. 
-                // We should update those to be paged too.
-                // For now, let's just use getTrendingPaged for the default case.
-                
-                val resultFlow = if (category == HomeCategory.GAMING) videoRepository.getGamingVideos()
-                                 else if (category == HomeCategory.SPORTS) videoRepository.getSportsVideos()
-                                 else if (category == HomeCategory.LIVE) videoRepository.getLiveVideos()
-                                 else videoRepository.getTrendingPaged(null) // Use Paged for default/Trending
-                
-                resultFlow.collect { result ->
-                    // Handle both List<Video> and PagedResult<Video>
-                    // This is a bit hacky because of type erasure/generics, but let's see
-                    
-                    // Since we know what we called, we can handle it.
-                    if (category == HomeCategory.GAMING || category == HomeCategory.SPORTS || category == HomeCategory.LIVE) {
-                         // These return Result<List<Video>>
-                         val listResult = result as Result<List<Video>> // Unsafe cast warning, but we know
-                         handleListResult(listResult, category)
-                    } else {
-                        // Trending returns Result<PagedResult<Video>>
-                        val pagedResult = result as Result<PagedResult<Video>>
-                        handlePagedResult(pagedResult, category)
-                    }
+            processCategoryLoad(category)
+        }
+    }
+
+    private suspend fun processCategoryLoad(category: HomeCategory) {
+        when (category) {
+            HomeCategory.ALL -> loadAllRandomContent()
+            HomeCategory.MUSIC -> loadMusicContent()
+            HomeCategory.GAMING, HomeCategory.SPORTS, HomeCategory.LIVE -> {
+                val flow = when (category) {
+                    HomeCategory.GAMING -> videoRepository.getGamingVideos()
+                    HomeCategory.SPORTS -> videoRepository.getSportsVideos()
+                    HomeCategory.LIVE -> videoRepository.getLiveVideos()
+                    else -> videoRepository.getTrending()
+                }
+                flow.collect { result ->
+                    handleListResult(result, category)
                 }
             }
+
         }
     }
 
@@ -173,10 +176,10 @@ class HomeViewModel @Inject constructor(
                     videos = pagedResult.items,
                     selectedCategory = category,
                     nextPageUrl = pagedResult.nextPageUrl
-                ) as HomeUiState
+                )
             },
             onFailure = { exception ->
-                HomeUiState.Error(exception.message ?: "Error desconocido") as HomeUiState
+                HomeUiState.Error(exception.message ?: "Error desconocido")
             }
         )
     }
@@ -219,34 +222,106 @@ class HomeViewModel @Inject constructor(
     }
     
     private suspend fun loadAllRandomContent() {
-        // Para "Todos", cargamos contenido variado y lo mezclamos
-        try {
-            val trendingFlow = videoRepository.getTrending()
-            val musicFlow = videoRepository.getMusicVideos()
-            val gamingFlow = videoRepository.getGamingVideos()
-            val sportsFlow = videoRepository.getSportsVideos()
-            
-            var allVideos = mutableListOf<Video>()
-            
-            // Recolectar resultados (esto podría optimizarse con async/await si los flujos fueran suspend functions directas)
-            // Como son flujos, los recolectamos secuencialmente por simplicidad, o podríamos usar combine
-            
-            trendingFlow.collect { result -> result.getOrNull()?.let { allVideos.addAll(it) } }
-            musicFlow.collect { result -> result.getOrNull()?.let { allVideos.addAll(it) } }
-            gamingFlow.collect { result -> result.getOrNull()?.let { allVideos.addAll(it) } }
-            sportsFlow.collect { result -> result.getOrNull()?.let { allVideos.addAll(it) } }
-            
-            if (allVideos.isNotEmpty()) {
-                // Mezclar aleatoriamente
-                allVideos.shuffle()
-                // Eliminar duplicados por URL
-                val distinctVideos = allVideos.distinctBy { it.url }
-                _uiState.value = HomeUiState.Success(distinctVideos, HomeCategory.ALL)
-            } else {
-                _uiState.value = HomeUiState.Error("No se pudo cargar contenido. Verifica tu conexión.")
+        // Ejecutar en IO para evitar bloqueos en el hilo principal
+        // Ejecutar en IO con timeout de 15 segundos para evitar bloqueos infinitos
+        withContext(Dispatchers.IO) {
+            try {
+                kotlinx.coroutines.withTimeout(15000L) {
+                    val mutex = Mutex()
+                    val allVideos = mutableListOf<Video>()
+                    
+                    // 1. Cargar Trending primero
+                    val trendingFlow = videoRepository.getTrending()
+                    
+                    trendingFlow.collect { result -> 
+                        result.fold(
+                            onSuccess = { videos ->
+                                if (videos.isNotEmpty()) {
+                                    android.util.Log.d("HomeViewModel", "Loaded ${videos.size} trending videos. Updating UI to Success.")
+                                    mutex.withLock {
+                                        allVideos.addAll(videos.take(10))
+                                    }
+                                    _uiState.value = HomeUiState.Success(allVideos.toList(), HomeCategory.ALL)
+                                } else {
+                                    android.util.Log.e("HomeViewModel", "Trending returned empty list")
+                                }
+                            },
+                            onFailure = { e ->
+                                android.util.Log.e("HomeViewModel", "Error loading trending", e)
+                                // No hacemos nada aquí, dejamos que las otras coroutines intenten cargar contenido
+                            }
+                        )
+                    }
+                    
+                    // 2. Cargar el resto en paralelo
+                    launch {
+                        val musicFlow = videoRepository.getMusicVideos()
+                        musicFlow.collect { result -> 
+                            result.fold(
+                                onSuccess = { videos ->
+                                    mutex.withLock {
+                                        allVideos.addAll(videos)
+                                    }
+                                    val distinctVideos = mutex.withLock { allVideos.toList() }.distinctBy { video -> video.url }.shuffled()
+                                    _uiState.value = HomeUiState.Success(distinctVideos, HomeCategory.ALL)
+                                },
+                                onFailure = { e ->
+                                    android.util.Log.e("HomeViewModel", "Error loading music", e)
+                                }
+                            )
+                        }
+                    }
+                    
+                    launch {
+                        val gamingFlow = videoRepository.getGamingVideos()
+                        gamingFlow.collect { result -> 
+                            result.fold(
+                                onSuccess = { videos ->
+                                    mutex.withLock {
+                                        allVideos.addAll(videos)
+                                    }
+                                    val distinctVideos = mutex.withLock { allVideos.toList() }.distinctBy { video -> video.url }.shuffled()
+                                    _uiState.value = HomeUiState.Success(distinctVideos, HomeCategory.ALL)
+                                },
+                                onFailure = { e ->
+                                    android.util.Log.e("HomeViewModel", "Error loading gaming", e)
+                                }
+                            )
+                        }
+                    }
+                    
+                    launch {
+                        val sportsFlow = videoRepository.getSportsVideos()
+                        sportsFlow.collect { result -> 
+                            result.fold(
+                                onSuccess = { videos ->
+                                    mutex.withLock {
+                                        allVideos.addAll(videos)
+                                    }
+                                    val distinctVideos = mutex.withLock { allVideos.toList() }.distinctBy { video -> video.url }.shuffled()
+                                    _uiState.value = HomeUiState.Success(distinctVideos, HomeCategory.ALL)
+                                },
+                                onFailure = { e ->
+                                    android.util.Log.e("HomeViewModel", "Error loading sports", e)
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                // Final check: si después de todo (o timeout) no hay videos y seguimos en Loading, mostrar error
+                if (_uiState.value is HomeUiState.Loading) {
+                     _uiState.value = HomeUiState.Error("No se pudo cargar contenido. Verifica tu conexión a internet.")
+                }
+                
+                Unit
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error in loadAllRandomContent", e)
+                if (_uiState.value !is HomeUiState.Success) {
+                    _uiState.value = HomeUiState.Error("Tiempo de espera agotado o error: ${e.message}")
+                }
+                Unit
             }
-        } catch (e: Exception) {
-            _uiState.value = HomeUiState.Error("Error cargando contenido: ${e.message}")
         }
     }
     

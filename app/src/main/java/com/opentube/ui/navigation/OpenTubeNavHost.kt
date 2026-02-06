@@ -161,8 +161,7 @@ fun OpenTubeNavHost(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        top = paddingValues.calculateTopPadding(),
-                        // Keep bottom padding fixed to prevent content jump when mini player appears
+                        // top = paddingValues.calculateTopPadding(), // Removed: Let screens handle top insets
                         bottom = if (showBottomBar) {
                             paddingValues.calculateBottomPadding()
                         } else {
@@ -200,12 +199,7 @@ fun OpenTubeNavHost(
                         android.util.Log.d("Navigation", "Home: Navigating to video: $videoId")
                         navController.navigate(Screen.VideoPlayer.createRoute(videoId))
                     },
-                    onPlaylistClick = { playlistId ->
-                        navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
-                    },
-                    onAlbumClick = { albumId ->
-                        navController.navigate(Screen.AlbumDetail.createRoute(albumId))
-                    },
+
                     onSearchClick = {
                         navController.navigate(Screen.Search.route)
                     }
@@ -367,7 +361,7 @@ fun OpenTubeNavHost(
             }
             
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                com.opentube.ui.screens.settings.SettingsScreen()
             }
         } // Fin del NavHost
             

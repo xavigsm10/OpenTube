@@ -8,8 +8,11 @@ import dagger.hilt.android.HiltAndroidApp
 import org.schabi.newpipe.extractor.NewPipe
 import com.opentube.data.extractor.NewPipeDownloaderImpl
 
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+
 @HiltAndroidApp
-class OpenTubeApplication : Application() {
+class OpenTubeApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         
@@ -18,6 +21,13 @@ class OpenTubeApplication : Application() {
         
         // Crear canal de notificaciones para reproducción de media
         createNotificationChannel()
+    }
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .crossfade(true)
+            .allowHardware(false) // CRITICAL: Fix for black screen/freezing on emulators
+            .build()
     }
     
     private fun createNotificationChannel() {

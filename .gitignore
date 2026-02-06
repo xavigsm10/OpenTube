@@ -98,3 +98,6 @@ lint/tmp/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Exclude LibreTube reference folder
+LibreTube/

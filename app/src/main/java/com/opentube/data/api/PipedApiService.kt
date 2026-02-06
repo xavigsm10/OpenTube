@@ -1,6 +1,11 @@
 package com.opentube.data.api
 
-import com.opentube.data.models.*
+import com.opentube.data.models.Channel
+import com.opentube.data.models.Playlist
+import com.opentube.data.models.SearchResult
+import com.opentube.data.models.SegmentData
+import com.opentube.data.models.Video
+import com.opentube.data.models.VideoDetails
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -30,6 +35,19 @@ interface PipedApiService {
     ): VideoDetails
     
     /**
+     * Get SponsorBlock segments for a video
+     * @param videoId YouTube video ID
+     * @param category JSON array of categories to fetch
+     * @param actionType JSON array of action types
+     */
+    @GET("sponsors/{videoId}")
+    suspend fun getSegments(
+        @Path("videoId") videoId: String,
+        @Query("category") category: String = "[\"sponsor\",\"selfpromo\",\"interaction\",\"intro\",\"outro\",\"preview\",\"music_offtopic\",\"filler\"]",
+        @Query("actionType") actionType: String? = null
+    ): SegmentData
+
+    /**
      * Search for videos, channels, and playlists
      * @param query Search query
      * @param filter Filter type: "all", "videos", "channels", "playlists"
@@ -38,7 +56,7 @@ interface PipedApiService {
     suspend fun search(
         @Query("q") query: String,
         @Query("filter") filter: String = "all"
-    ): SearchResults
+    ): SearchResult // Changed from SearchResults (local model) to SearchResult (LibreTube model)
     
     /**
      * Get next page of search results
@@ -46,12 +64,12 @@ interface PipedApiService {
      * @param filter Filter type
      * @param nextpage Next page token
      */
-    @GET("search")
+    @GET("nextpage/search") // Fixed endpoint path from "search" to "nextpage/search"
     suspend fun searchNextPage(
         @Query("q") query: String,
         @Query("filter") filter: String = "all",
         @Query("nextpage") nextpage: String
-    ): SearchResults
+    ): SearchResult
     
     /**
      * Get channel information
