@@ -190,14 +190,22 @@ class VideoRepository @Inject constructor(
             // Get all audio streams - similar to LibreTube approach
             // DashHelper will filter only those with proper indexing
             val audioStreams = streamInfo.audioStreams.map { stream ->
+                // Extract locale info
+                val locale = stream.locale
+                val languageCode = locale?.language
+                // Get display language in Spanish (user preference)
+                val displayLanguage = locale?.getDisplayLanguage(java.util.Locale("es", "ES"))?.replaceFirstChar { it.uppercase() }
+                
                 AudioStream(
                     url = stream.content ?: "",
                     format = stream.format?.name ?: "m4a",
                     quality = "${stream.averageBitrate / 1000}kbps",
                     mimeType = stream.format?.mimeType ?: "audio/mp4",
                     codec = stream.codec,
-                    audioTrackId = null,
-                    audioTrackName = stream.format?.name,
+                    // Use language code as ID if available, otherwise null
+                    audioTrackId = languageCode,
+                    // Use display language -> specific track name -> format name
+                    audioTrackName = displayLanguage ?: stream.audioTrackName, 
                     bitrate = stream.averageBitrate,
                     initStart = stream.initStart?.toInt() ?: 0,
                     initEnd = stream.initEnd?.toInt() ?: 0,
@@ -243,13 +251,14 @@ class VideoRepository @Inject constructor(
                             views = item.viewCount,
                             uploaderVerified = item.isUploaderVerified,
                             isShort = item.duration < 60,
-                            isLive = item.streamType == org.schabi.newpipe.extractor.stream.StreamType.LIVE_STREAM
-                        )
-                    },
-                liveNow = streamInfo.streamType == org.schabi.newpipe.extractor.stream.StreamType.LIVE_STREAM,
-                hlsUrl = streamInfo.hlsUrl,
-                dashUrl = streamInfo.dashMpdUrl, // Agregar dashUrl
-                videoId = videoId  // ✅ Agregar el videoId
+                // Improved live detection: Trust HLS presence if streamType is ambiguous
+                isLive = streamInfo.streamType == org.schabi.newpipe.extractor.stream.StreamType.LIVE_STREAM || !streamInfo.hlsUrl.isNullOrEmpty()
+            )
+        },
+    liveNow = streamInfo.streamType == org.schabi.newpipe.extractor.stream.StreamType.LIVE_STREAM || !streamInfo.hlsUrl.isNullOrEmpty(),
+    hlsUrl = streamInfo.hlsUrl,
+    dashUrl = streamInfo.dashMpdUrl,
+    videoId = videoId
             )
             
             // Actualizar caché

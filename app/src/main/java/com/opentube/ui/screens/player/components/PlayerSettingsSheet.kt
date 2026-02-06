@@ -347,48 +347,50 @@ private fun AudioSettings(
 ) {
     // Helper function to get display name for audio track
     fun getAudioTrackDisplayName(stream: AudioStream): String {
-        // Try to get the language from audioTrackId (usually contains language code like "es.1", "en.1")
+        // 1. Try audioTrackName first (populated with localized language in VideoRepository)
+        val trackName = stream.audioTrackName
+        if (!trackName.isNullOrEmpty() && 
+            !trackName.contains("Opus", ignoreCase = true) && 
+            !trackName.contains("WebM", ignoreCase = true) && 
+            !trackName.contains("mp4a", ignoreCase = true) &&
+            !trackName.contains("m4a", ignoreCase = true)) {
+            return trackName
+        }
+
+        // 2. Try to get the language from audioTrackId (fallback)
         val languageCode = stream.audioTrackId?.split(".")?.firstOrNull()?.take(2)
         
-        // Convert language code to readable name
+        // Convert language code to readable name (Spanish)
         val languageName = when (languageCode?.lowercase()) {
             "es" -> "Español"
-            "en" -> "English"
-            "pt" -> "Português"
-            "fr" -> "Français"
-            "de" -> "Deutsch"
+            "en" -> "Inglés"
+            "pt" -> "Portugués"
+            "fr" -> "Francés"
+            "de" -> "Alemán"
             "it" -> "Italiano"
-            "ja" -> "日本語"
-            "ko" -> "한국어"
-            "zh" -> "中文"
-            "ru" -> "Русский"
-            "ar" -> "العربية"
-            "hi" -> "हिन्दी"
-            "tr" -> "Türkçe"
-            "nl" -> "Nederlands"
-            "pl" -> "Polski"
-            "sv" -> "Svenska"
-            "da" -> "Dansk"
-            "no" -> "Norsk"
-            "fi" -> "Suomi"
-            "el" -> "Ελληνικά"
-            "he" -> "עברית"
-            "th" -> "ไทย"
-            "vi" -> "Tiếng Việt"
-            "id" -> "Bahasa Indonesia"
-            "ms" -> "Bahasa Melayu"
+            "ja" -> "Japonés"
+            "ko" -> "Coreano"
+            "zh" -> "Chino"
+            "ru" -> "Ruso"
+            "ar" -> "Árabe"
+            "hi" -> "Hindi"
+            "tr" -> "Turco"
+            "nl" -> "Holandés"
+            "pl" -> "Polaco"
+            "sv" -> "Sueco"
+            "da" -> "Danés"
+            "no" -> "Noruego"
+            "fi" -> "Finlandés"
+            "el" -> "Griego"
+            "he" -> "Hebreo"
+            "th" -> "Tailandés"
+            "vi" -> "Vietnamita"
+            "id" -> "Indonesio"
+            "ms" -> "Malayo"
             else -> null
         }
         
-        // Try audioTrackName if language not found
-        val trackName = stream.audioTrackName
-        
-        return when {
-            !languageName.isNullOrEmpty() -> languageName
-            !trackName.isNullOrEmpty() && !trackName.contains("Opus", ignoreCase = true) && 
-                !trackName.contains("WebM", ignoreCase = true) && !trackName.contains("mp4a", ignoreCase = true) -> trackName
-            else -> "Audio principal"
-        }
+        return languageName ?: "Audio principal"
     }
     
     fun getAudioTrackSubtitle(stream: AudioStream): String {

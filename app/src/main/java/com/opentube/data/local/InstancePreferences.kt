@@ -22,7 +22,7 @@ class InstancePreferences @Inject constructor(
     private val INSTANCE_API_URL = stringPreferencesKey("instance_api_url")
     
     // Default fallback - Using a more stable instance as default
-    private val DEFAULT_API_URL = "https://pipedapi.adminforge.de/"
+    private val DEFAULT_API_URL = "https://pipedapi.moomoo.me/"
 
     val apiUrlFlow: Flow<String> = context.dataStore.data
         .map { preferences ->
