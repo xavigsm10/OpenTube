@@ -27,6 +27,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.opentube.ui.screens.home.HomeScreen
+import com.opentube.ui.screens.splash.SplashScreen
 import com.opentube.ui.screens.search.SearchScreen
 import com.opentube.ui.screens.player.VideoPlayerScreen
 import com.opentube.ui.screens.channel.ChannelScreen
@@ -157,7 +158,7 @@ fun OpenTubeNavHost(
             // El padding SIEMPRE incluye el bottomBar, independiente del mini player
             NavHost(
                 navController = navController,
-                startDestination = Screen.Home.route,
+                startDestination = Screen.Splash.route,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
@@ -193,6 +194,16 @@ fun OpenTubeNavHost(
                     ) + fadeOut(animationSpec = tween(300))
                 }
             ) {
+            composable(Screen.Splash.route) {
+                SplashScreen(
+                    onSplashFinished = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable(Screen.Home.route) {
                 HomeScreen(
                     onVideoClick = { videoId ->

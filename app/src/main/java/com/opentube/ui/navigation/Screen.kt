@@ -4,6 +4,7 @@ package com.opentube.ui.navigation
  * Navigation routes for the app
  */
 sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
     object Home : Screen("home")
     object Shorts : Screen("shorts")
     object Search : Screen("search")
