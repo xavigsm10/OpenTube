@@ -101,4 +101,20 @@ object NetworkModule {
             .build()
             .create(InstanceListService::class.java)
     }
+    
+    // --- GITHUB API FOR APP UPDATES ---
+    
+    @Provides
+    @Singleton
+    fun provideGithubApiService(
+        @Named("GitHubClient") client: OkHttpClient,
+        gson: Gson
+    ): com.opentube.data.api.GithubApiService {
+        return Retrofit.Builder()
+            .baseUrl(com.opentube.data.api.GithubApiService.BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+            .create(com.opentube.data.api.GithubApiService::class.java)
+    }
 }

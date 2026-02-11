@@ -131,6 +131,24 @@ fun VideoPlayerScreen(
         }
     }
     
+    // Handle seamless transition from mini player - ensure playback continues
+    LaunchedEffect(existingPlayer) {
+        if (existingPlayer != null) {
+            android.util.Log.d("VideoPlayerScreen", "Transition from mini player detected - ensuring playback continues")
+            // Small delay to let the UI settle
+            delay(100)
+            exoPlayer?.let { player ->
+                // If player was playing before, make sure it continues
+                if (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING) {
+                    if (!player.isPlaying) {
+                        android.util.Log.d("VideoPlayerScreen", "Resuming playback after mini player transition")
+                        player.play()
+                    }
+                }
+            }
+        }
+    }
+    
     // Handle back button - Minimize video player
     BackHandler(enabled = !isFullscreen) {
         val state = uiState
@@ -398,7 +416,16 @@ fun VideoPlayerScreen(
                         }
                     } else {
                         android.util.Log.d("VideoPlayerScreen", "Using existing mini player - keeping content")
-                    }                // Asignar player DESPUÉS de prepararlo
+                        // Asegurar que el video siga reproduciéndose cuando viene del miniplayer
+                        if (player.playbackState == androidx.media3.common.Player.STATE_READY || 
+                            player.playbackState == androidx.media3.common.Player.STATE_BUFFERING) {
+                            // Mantener el estado de reproducción (si estaba reproduciendo, seguir reproduciendo)
+                            if (!player.isPlaying && player.playWhenReady) {
+                                player.play()
+                            }
+                        }
+                    }
+                    // Asignar player DESPUÉS de prepararlo
                 // Asignar player DESPUÉS de prepararlo
                 // exoPlayer = player // Removed: exoPlayer is now a val from ViewModel
                 
@@ -528,14 +555,25 @@ fun VideoPlayerScreen(
                     PlayerGestureOverlay(
                         onSingleTap = { showControls = !showControls },
                         onDoubleTapSeek = { seconds ->
-                            exoPlayer?.seekTo((exoPlayer.currentPosition + seconds * 1000).coerceIn(0, exoPlayer.duration))
+                            exoPlayer?.seekTo((exoPlayer?.currentPosition ?: 0) + seconds * 1000)
                         },
-                        onVolumeChange = { /* Handled internally */ },
-                        onBrightnessChange = { value ->
-                            val lp = activity?.window?.attributes
-                            if (lp != null) {
-                                lp.screenBrightness = value
-                                activity.window?.attributes = lp
+                        onSwipeDown = {
+                            if (isFullscreen) {
+                                viewModel.toggleFullscreen()
+                            } else {
+                                // Smart cast for accessing videoDetails
+                                val currentState = uiState
+                                if (currentState is VideoPlayerUiState.Success) {
+                                    isMinimizing = true
+                                    onMinimize?.invoke(
+                                        currentState.videoDetails.title,
+                                        currentState.videoDetails.uploader,
+                                        currentState.videoDetails.thumbnailUrl,
+                                        isPlaying,
+                                        exoPlayer
+                                    )
+                                    onNavigateBack()
+                                }
                             }
                         }
                     ) {

@@ -190,22 +190,14 @@ class VideoRepository @Inject constructor(
             // Get all audio streams - similar to LibreTube approach
             // DashHelper will filter only those with proper indexing
             val audioStreams = streamInfo.audioStreams.map { stream ->
-                // Extract locale info
-                val locale = stream.locale
-                val languageCode = locale?.language
-                // Get display language in Spanish (user preference)
-                val displayLanguage = locale?.getDisplayLanguage(java.util.Locale("es", "ES"))?.replaceFirstChar { it.uppercase() }
-                
                 AudioStream(
                     url = stream.content ?: "",
                     format = stream.format?.name ?: "m4a",
                     quality = "${stream.averageBitrate / 1000}kbps",
                     mimeType = stream.format?.mimeType ?: "audio/mp4",
                     codec = stream.codec,
-                    // Use language code as ID if available, otherwise null
-                    audioTrackId = languageCode,
-                    // Use display language -> specific track name -> format name
-                    audioTrackName = displayLanguage ?: stream.audioTrackName, 
+                    audioTrackId = null, // Locale/ID not directly available in this version of Extractor
+                    audioTrackName = stream.format?.name, 
                     bitrate = stream.averageBitrate,
                     initStart = stream.initStart?.toInt() ?: 0,
                     initEnd = stream.initEnd?.toInt() ?: 0,

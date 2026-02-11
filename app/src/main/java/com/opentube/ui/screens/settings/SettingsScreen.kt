@@ -16,13 +16,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.opentube.BuildConfig
+import com.opentube.ui.components.UpdateDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settings.collectAsState()
+    val updateUiState by updateViewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showThemeDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
@@ -30,6 +34,7 @@ fun SettingsScreen(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showCountryDialog by remember { mutableStateOf(false) }
     var showInstanceDialog by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -256,8 +261,19 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "Acerca de OpenTube",
-                    subtitle = "Versión 1.0.0",
+                    subtitle = "Versión ${BuildConfig.VERSION_NAME}",
                     onClick = { showAboutDialog = true }
+                )
+            }
+            
+            item { Divider() }
+            
+            item {
+                SettingsItem(
+                    icon = Icons.Default.SystemUpdate,
+                    title = "Buscar actualizaciones",
+                    subtitle = "Verificar si hay una nueva versión",
+                    onClick = { showUpdateDialog = true }
                 )
             }
             
@@ -360,6 +376,20 @@ fun SettingsScreen(
                 showInstanceDialog = false
             },
             onDismiss = { showInstanceDialog = false }
+        )
+    }
+    
+    // Update Dialog
+    if (showUpdateDialog) {
+        UpdateDialog(
+            uiState = updateUiState,
+            onCheckForUpdates = { updateViewModel.checkForUpdates() },
+            onDownloadUpdate = { updateViewModel.downloadUpdate() },
+            onInstallUpdate = { updateViewModel.installUpdate() },
+            onDismiss = { 
+                updateViewModel.dismiss()
+                showUpdateDialog = false 
+            }
         )
     }
 }
@@ -631,7 +661,7 @@ private fun AboutDialog(
         text = {
             Column {
                 Text(
-                    text = "Versión 1.0.0",
+                    text = "Versión ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Spacer(modifier = Modifier.height(8.dp))

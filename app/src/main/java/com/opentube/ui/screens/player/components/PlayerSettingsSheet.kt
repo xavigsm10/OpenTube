@@ -416,11 +416,21 @@ private fun AudioSettings(
         }
         
         // Group audio streams by language/track to avoid duplicates
+        // If language info is missing, we might get multiple "Audio principal".
+        // Use index to distinguish them in that case.
         val groupedStreams = audioStreams
-            .groupBy { getAudioTrackDisplayName(it) }
-            .map { (name, streams) -> 
-                // Pick the highest quality stream from each language group
-                name to streams.maxByOrNull { it.bitrate ?: 0 }!!
+            .withIndex()
+            .groupBy { (index, stream) -> 
+                val name = getAudioTrackDisplayName(stream)
+                if (name == "Audio principal" && audioStreams.size > 1) {
+                    "Pista ${index + 1}" // Fallback unique name
+                } else {
+                    name
+                }
+            }
+            .map { (name, indexedStreams) -> 
+                // Pick the highest quality stream from each group
+                name to indexedStreams.map { it.value }.maxByOrNull { it.bitrate ?: 0 }!!
             }
         
         items(groupedStreams) { (displayName, audioStream) ->

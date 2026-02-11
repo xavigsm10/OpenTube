@@ -57,9 +57,12 @@ fun SearchScreen(
     val focusManager = LocalFocusManager.current
     var showSuggestions by remember { mutableStateOf(false) }
     
-    // Request focus only when first entering the screen
+    // Request focus only when first entering the screen with no existing search
+    // This prevents keyboard from appearing when returning from video player
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
+        if (searchQuery.isEmpty()) {
+            focusRequester.requestFocus()
+        }
     }
     
     Scaffold(
