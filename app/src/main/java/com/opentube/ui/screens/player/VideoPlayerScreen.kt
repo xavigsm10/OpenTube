@@ -22,7 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -78,6 +83,8 @@ fun VideoPlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     var isMinimizing by remember { mutableStateOf(false) }
+    var showMoreVideos by remember { mutableStateOf(false) }
+    var showComments by remember { mutableStateOf(false) }
     
     // Manage fullscreen
     val activity = context as? Activity
@@ -549,6 +556,25 @@ fun VideoPlayerScreen(
                         )
                         .background(androidx.compose.ui.graphics.Color.Black)
                 ) {
+                    
+                    // Ambient Mode (Ambilight effect)
+                    // We show this behind the player, blurred
+                    if (state is VideoPlayerUiState.Success) {
+                        AsyncImage(
+                            model = state.videoDetails.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .alpha(0.6f) // Adjust alpha for subtlety
+                                .blur(
+                                    radiusX = 100.dp, 
+                                    radiusY = 100.dp, 
+                                    edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded
+                                )
+                        )
+                    }
+
                     // Obtener el resize mode del estado
                     val resizeMode = (uiState as? VideoPlayerUiState.Success)?.playerSettings?.resizeMode ?: 0
 
@@ -735,10 +761,135 @@ fun VideoPlayerScreen(
                             isFullscreen = isFullscreen,
                             visible = showControls,
                             videoTitle = videoDetails.title,
-                            resizeMode = resizeMode
+                            uploader = videoDetails.uploader,
+                            resizeMode = resizeMode,
+                            onNextVideo = {
+                                if (videoDetails.relatedStreams.isNotEmpty()) {
+                                    val nextVideo = videoDetails.relatedStreams.first()
+                                    onVideoClick?.invoke(nextVideo.videoId)
+                                }
+                            },
+                            onPreviousVideo = {
+                                exoPlayer?.let { player ->
+                                    if (player.currentPosition > 5000) {
+                                        player.seekTo(0)
+                                    } else {
+                                        onNavigateBack()
+                                    }
+                                } ?: onNavigateBack()
+                            },
+                            onMoreVideosClick = { 
+                                showMoreVideos = true 
+                                showComments = false
+                            },
+                            onCommentsClick = {
+                                showComments = !showComments
+                                if (showComments) showMoreVideos = false
+                            }
                         )
 
+                    // Más Videos Overlay (Horizontal)
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isFullscreen && showMoreVideos,
+                        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it }) + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.slideOutVertically(targetOffsetY = { it }) + androidx.compose.animation.fadeOut(),
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(280.dp) // Adjust height as needed
+                                .background(Color.Black.copy(alpha = 0.85f))
+                                .padding(top = 16.dp, bottom = 16.dp)
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Más videos",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    IconButton(onClick = { showMoreVideos = false }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Cerrar",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                androidx.compose.foundation.lazy.LazyRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentPadding = PaddingValues(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    items(videoDetails.relatedStreams.take(20)) { relatedVideo ->
+                                        Box(modifier = Modifier.width(280.dp)) {
+                                            VideoCard(
+                                                video = relatedVideo,
+                                                onClick = { 
+                                                    showMoreVideos = false
+                                                    onVideoClick?.invoke(relatedVideo.videoId)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
+                    // Panel Lateral de Comentarios (Horizontal)
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isFullscreen && showComments && !showMoreVideos,
+                        enter = androidx.compose.animation.slideInHorizontally(initialOffsetX = { it }) + androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.slideOutHorizontally(targetOffsetX = { it }) + androidx.compose.animation.fadeOut(),
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().fillMaxWidth(0.4f)
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Comentarios",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    IconButton(onClick = { showComments = false }) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar")
+                                    }
+                                }
+                                Divider()
+                                Box(modifier = Modifier.weight(1f)) {
+                                    CommentsSection(
+                                        comments = state.comments,
+                                        isLoading = state.isLoadingComments,
+                                        onLoadMore = { viewModel.loadMoreComments() },
+                                        onLoadReplies = { commentId, repliesPage ->
+                                            viewModel.loadReplies(commentId, repliesPage)
+                                        },
+                                        replies = state.replies,
+                                        loadingReplies = state.loadingReplies
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 if (!isFullscreen) {

@@ -226,7 +226,21 @@ fun OpenTubeNavHost(
                 )
             }
             
-            composable(Screen.Search.route) {
+            composable(
+                route = Screen.Search.route,
+                enterTransition = {
+                    slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = tween(500)
+                    ) + fadeIn(animationSpec = tween(500))
+                },
+                exitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = tween(500)
+                    ) + fadeOut(animationSpec = tween(500))
+                }
+            ) {
                 SearchScreen(
                     onBackClick = { navController.navigateUp() },
                     onVideoClick = { videoId ->

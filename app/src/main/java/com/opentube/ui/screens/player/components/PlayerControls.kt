@@ -41,10 +41,15 @@ fun PlayerControls(
     visible: Boolean,
     modifier: Modifier = Modifier,
     videoTitle: String = "",
+    uploader: String = "",
     resizeMode: Int = 0,
     onResizeModeClick: () -> Unit = {},
     onBackClick: () -> Unit = {},
-    onShareClick: () -> Unit = {}
+    onShareClick: () -> Unit = {},
+    onNextVideo: () -> Unit = {},
+    onPreviousVideo: () -> Unit = {},
+    onMoreVideosClick: () -> Unit = {},
+    onCommentsClick: () -> Unit = {}
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -70,16 +75,39 @@ fun PlayerControls(
                             )
                         )
                     )
-                    .padding(horizontal = 16.dp, vertical = 8.dp), // Removed statusBarsPadding
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Minimizar",
-                        tint = Color.White
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Minimizar",
+                            tint = Color.White
+                        )
+                    }
+                    
+                    if (isFullscreen) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = videoTitle,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = uploader,
+                                color = Color.White.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -114,14 +142,14 @@ fun PlayerControls(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Rewind 10s
+                // Previous Video
                 IconButton(
-                    onClick = onRewind,
+                    onClick = onPreviousVideo,
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Replay10,
-                        contentDescription = "Retroceder 10s",
+                        imageVector = Icons.Filled.SkipPrevious,
+                        contentDescription = "Video Anterior",
                         tint = Color.White,
                         modifier = Modifier.size(32.dp)
                     )
@@ -142,14 +170,14 @@ fun PlayerControls(
                     )
                 }
                 
-                // Forward 10s
+                // Next Video
                 IconButton(
-                    onClick = onForward,
+                    onClick = onNextVideo,
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Forward10,
-                        contentDescription = "Adelantar 10s",
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = "Siguiente Video",
                         tint = Color.White,
                         modifier = Modifier.size(32.dp)
                     )
@@ -201,6 +229,46 @@ fun PlayerControls(
                     bufferedPosition = bufferedPosition,
                     onSeek = onSeek
                 )
+
+                if (isFullscreen) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Comments Button
+                            IconButton(onClick = onCommentsClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Comment,
+                                    contentDescription = "Comentarios",
+                                    tint = Color.White
+                                )
+                            }
+                            // Share Button
+                            IconButton(onClick = onShareClick) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Compartir",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                        
+                        // Más Videos Button
+                        TextButton(
+                            onClick = onMoreVideosClick,
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White)
+                        ) {
+                            Text(
+                                text = "Más videos",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -21,7 +21,8 @@ private val Context.searchHistoryDataStore: DataStore<Preferences> by preference
 
 data class SearchHistoryItem(
     val query: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val thumbnailUrl: String? = null
 )
 
 @Singleton
@@ -47,7 +48,7 @@ class SearchHistoryManager @Inject constructor(
         }
     
     // Agregar búsqueda al historial
-    suspend fun addSearch(query: String) {
+    suspend fun addSearch(query: String, thumbnailUrl: String? = null) {
         if (query.isBlank()) return
         
         context.searchHistoryDataStore.edit { preferences ->
@@ -58,9 +59,15 @@ class SearchHistoryManager @Inject constructor(
                 emptyList()
             }
             
-            // Eliminar duplicados y agregar nuevo
-            val newHistory = (listOf(SearchHistoryItem(query)) + currentHistory)
-                .distinctBy { it.query.lowercase() }
+            // Si ya existe y no pasamos un nuevo thumbnail, conservamos el anterior.
+            // Si pasamos un nuevo thumbnail, lo actualizamos.
+            val existingItem = currentHistory.find { it.query.equals(query, ignoreCase = true) }
+            val finalThumbnail = thumbnailUrl ?: existingItem?.thumbnailUrl
+            
+            val newItem = SearchHistoryItem(query, System.currentTimeMillis(), finalThumbnail)
+            
+            // Eliminar duplicados y agregar nuevo al inicio
+            val newHistory = (listOf(newItem) + currentHistory.filter { !it.query.equals(query, ignoreCase = true) })
                 .take(MAX_HISTORY_ITEMS)
             
             preferences[HISTORY_KEY] = serializeHistory(newHistory)
@@ -96,10 +103,13 @@ class SearchHistoryManager @Inject constructor(
         
         for (i in 0 until jsonArray.length()) {
             val jsonObject = jsonArray.getJSONObject(i)
+            val thumb = jsonObject.optString("thumbnailUrl", "")
+            val finalThumb = if (thumb.isNullOrEmpty() || thumb == "null") null else thumb
             list.add(
                 SearchHistoryItem(
                     query = jsonObject.getString("query"),
-                    timestamp = jsonObject.optLong("timestamp", System.currentTimeMillis())
+                    timestamp = jsonObject.optLong("timestamp", System.currentTimeMillis()),
+                    thumbnailUrl = finalThumb
                 )
             )
         }
@@ -115,6 +125,7 @@ class SearchHistoryManager @Inject constructor(
             val jsonObject = JSONObject()
             jsonObject.put("query", item.query)
             jsonObject.put("timestamp", item.timestamp)
+            item.thumbnailUrl?.let { jsonObject.put("thumbnailUrl", it) }
             jsonArray.put(jsonObject)
         }
         

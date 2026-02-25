@@ -31,7 +31,7 @@ fun MarkableProgressBar(
     onSeekStart: () -> Unit = {},
     modifier: Modifier = Modifier,
     barHeight: Dp = 4.dp,
-    thumbRadius: Dp = 8.dp,
+    thumbRadius: Dp = 12.dp,
     activeColor: Color = Color(0xFFFF0000),
     inactiveColor: Color = Color.White.copy(alpha = 0.3f),
     bufferedColor: Color = Color.White.copy(alpha = 0.5f)
@@ -46,7 +46,7 @@ fun MarkableProgressBar(
     Canvas(
         modifier = modifier
             .fillMaxWidth()
-            .height(20.dp) // Touch target size
+            .height(48.dp) // Touch target size
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
                     val progress = (offset.x / size.width).coerceIn(0f, 1f)

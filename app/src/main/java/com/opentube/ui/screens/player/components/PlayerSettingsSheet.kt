@@ -349,11 +349,7 @@ private fun AudioSettings(
     fun getAudioTrackDisplayName(stream: AudioStream): String {
         // 1. Try audioTrackName first (populated with localized language in VideoRepository)
         val trackName = stream.audioTrackName
-        if (!trackName.isNullOrEmpty() && 
-            !trackName.contains("Opus", ignoreCase = true) && 
-            !trackName.contains("WebM", ignoreCase = true) && 
-            !trackName.contains("mp4a", ignoreCase = true) &&
-            !trackName.contains("m4a", ignoreCase = true)) {
+        if (!trackName.isNullOrEmpty()) {
             return trackName
         }
 

@@ -75,11 +75,11 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun search(query: String = _searchQuery.value) {
+    fun search(query: String = _searchQuery.value, thumbnailUrl: String? = null) {
         if (query.isBlank()) return
 
         viewModelScope.launch {
-            searchHistoryManager.addSearch(query)
+            searchHistoryManager.addSearch(query, thumbnailUrl)
         }
 
         val pagingSource = SearchPagingSource(newPipeHelper, query)

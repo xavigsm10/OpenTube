@@ -1,11 +1,16 @@
 package com.opentube.ui.screens.player.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.Icon
@@ -14,10 +19,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 @Composable
 fun PlayerGestureOverlay(
@@ -48,16 +57,29 @@ private fun GestureHandler(
 ) {
     var accumulatedDragY by remember { mutableFloatStateOf(0f) }
     
-    // For Seek Animation
     var showSeekAnim by remember { mutableStateOf(false) }
     var seekForward by remember { mutableStateOf(true) }
+    var seekCount by remember { mutableIntStateOf(0) } // To trigger animation restart
 
     val context = LocalContext.current
     
-    LaunchedEffect(showSeekAnim) {
+    // Animation states
+    var animTrigger by remember { mutableStateOf(false) }
+    val slideOffset by animateFloatAsState(
+        targetValue = if (animTrigger) 1f else 0f,
+        animationSpec = tween(durationMillis = 600),
+        label = "slideAnimation"
+    )
+
+    LaunchedEffect(seekCount) {
         if (showSeekAnim) {
-            kotlinx.coroutines.delay(600)
+            animTrigger = false // Reset
+            kotlinx.coroutines.delay(50) // Small delay to allow reset to register
+            animTrigger = true // Start animation
+            
+            kotlinx.coroutines.delay(650) // Wait for animation to finish
             showSeekAnim = false
+            animTrigger = false
         }
     }
 
@@ -77,6 +99,7 @@ private fun GestureHandler(
                             onDoubleTapSeek(-10)
                         }
                         showSeekAnim = true
+                        seekCount++
                     }
                 )
             }
@@ -109,30 +132,54 @@ private fun GestureHandler(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(0.4f)
-                    .align(if (seekForward) Alignment.CenterEnd else Alignment.CenterStart)
-                    .background(
-                        Color.White.copy(alpha = 0.1f), 
-                        RoundedCornerShape(
-                            topStart = if (seekForward) 100.dp else 0.dp, 
-                            bottomStart = if (seekForward) 100.dp else 0.dp, 
-                            topEnd = if (!seekForward) 100.dp else 0.dp, 
-                            bottomEnd = if (!seekForward) 100.dp else 0.dp
-                        )
-                    ),
+                    .align(if (seekForward) Alignment.CenterEnd else Alignment.CenterStart),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = if (seekForward) Icons.Default.Forward10 else Icons.Default.Replay10,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text(
-                        text = if (seekForward) "+10s" else "-10s",
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge
-                    )
+                // Background gradient removed as per image 2, just showing the +10 and arrow
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (!seekForward) {
+                            // Left Arrow sliding left
+                            Icon(
+                                imageVector = Icons.Default.ChevronLeft,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .offset { IntOffset(x = -(slideOffset * 30f).roundToInt(), y = 0) }
+                                    .alpha(1f - slideOffset)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        
+                        Text(
+                            text = if (seekForward) "+10" else "-10",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        
+                        if (seekForward) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // Right Arrow sliding right
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .offset { IntOffset(x = (slideOffset * 30f).roundToInt(), y = 0) }
+                                    .alpha(1f - slideOffset)
+                            )
+                        }
+                    }
                 }
             }
         }

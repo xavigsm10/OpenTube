@@ -31,6 +31,11 @@ import com.opentube.R
 import com.opentube.ui.components.VideoCard
 import com.opentube.data.models.Video
 
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+
 import androidx.compose.ui.ExperimentalComposeUiApi
 
 /**
@@ -198,8 +203,21 @@ fun SearchScreen(
                                     headlineContent = { Text(historyItem.query) },
                                     leadingContent = { Icon(Icons.Default.History, contentDescription = null) },
                                     trailingContent = {
-                                        IconButton(onClick = { viewModel.removeFromHistory(historyItem.query) }) {
-                                            Icon(Icons.Default.Close, contentDescription = "Eliminar")
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (historyItem.thumbnailUrl != null) {
+                                                AsyncImage(
+                                                    model = historyItem.thumbnailUrl,
+                                                    contentDescription = null,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .size(56.dp, 32.dp)
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                            }
+                                            IconButton(onClick = { viewModel.removeFromHistory(historyItem.query) }) {
+                                                Icon(Icons.Default.Close, contentDescription = "Eliminar")
+                                            }
                                         }
                                     }
                                 )
@@ -221,7 +239,12 @@ fun SearchScreen(
                                 if (video != null) {
                                     VideoCard(
                                         video = video,
-                                        onClick = { onVideoClick(video.videoId) }
+                                        onClick = {
+                                            if (searchQuery.isNotEmpty()) {
+                                                viewModel.search(searchQuery, video.thumbnail)
+                                            }
+                                            onVideoClick(video.videoId)
+                                        }
                                     )
                                 }
                             }
