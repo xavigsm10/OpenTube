@@ -18,7 +18,7 @@ import com.opentube.ui.components.VideoCard
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    onVideoClick: (String, androidx.compose.ui.geometry.Rect?) -> Unit,
+    onVideoClick: (String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit,
     onSearchClick: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
@@ -136,7 +136,7 @@ fun LibraryScreen(
 @Composable
 private fun HistoryTab(
     videos: List<com.opentube.data.local.WatchHistoryEntity>,
-    onVideoClick: (String, androidx.compose.ui.geometry.Rect?) -> Unit,
+    onVideoClick: (String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit,
     onDeleteClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -189,8 +189,8 @@ private fun HistoryTab(
                                 uploaderVerified = false,
                                 isShort = false
                             ),
-                            onClickWithRect = { rect -> onVideoClick(historyItem.videoId, rect) },
-                            onClick = { onVideoClick(historyItem.videoId, null) }
+                            onClickWithRect = { rect -> onVideoClick(historyItem.videoId, historyItem.title, historyItem.uploaderName, historyItem.thumbnail, rect) },
+                            onClick = { onVideoClick(historyItem.videoId, historyItem.title, historyItem.uploaderName, historyItem.thumbnail, null) }
                         )
                     }
                 )
@@ -202,7 +202,7 @@ private fun HistoryTab(
 @Composable
 private fun FavoritesTab(
     videos: List<com.opentube.data.local.FavoriteEntity>,
-    onVideoClick: (String, androidx.compose.ui.geometry.Rect?) -> Unit,
+    onVideoClick: (String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit,
     onDeleteClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -255,8 +255,8 @@ private fun FavoritesTab(
                                 uploaderVerified = false,
                                 isShort = false
                             ),
-                            onClickWithRect = { rect -> onVideoClick(favoriteItem.videoId, rect) },
-                            onClick = { onVideoClick(favoriteItem.videoId, null) }
+                            onClickWithRect = { rect -> onVideoClick(favoriteItem.videoId, favoriteItem.title, favoriteItem.uploaderName, favoriteItem.thumbnail, rect) },
+                            onClick = { onVideoClick(favoriteItem.videoId, favoriteItem.title, favoriteItem.uploaderName, favoriteItem.thumbnail, null) }
                         )
                     }
                 )

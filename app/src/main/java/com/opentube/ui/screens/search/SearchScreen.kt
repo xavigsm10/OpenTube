@@ -46,7 +46,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
-    onVideoClick: (String, androidx.compose.ui.geometry.Rect?) -> Unit,
+    onVideoClick: (String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit,
     onChannelClick: (String) -> Unit,
     viewModel: SearchViewModel = hiltViewModel()
 ) {
@@ -243,13 +243,13 @@ fun SearchScreen(
                                             if (searchQuery.isNotEmpty()) {
                                                 viewModel.search(searchQuery, video.thumbnail)
                                             }
-                                            onVideoClick(video.videoId, rect)
+                                            onVideoClick(video.videoId, video.title, video.uploaderName, video.thumbnail, rect)
                                         },
                                         onClick = {
                                             if (searchQuery.isNotEmpty()) {
                                                 viewModel.search(searchQuery, video.thumbnail)
                                             }
-                                            onVideoClick(video.videoId, null)
+                                            onVideoClick(video.videoId, video.title, video.uploaderName, video.thumbnail, null)
                                         }
                                     )
                                 }

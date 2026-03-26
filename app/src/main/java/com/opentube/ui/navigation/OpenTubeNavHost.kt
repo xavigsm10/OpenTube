@@ -210,9 +210,15 @@ fun OpenTubeNavHost(
 
             composable(Screen.Home.route) {
                 HomeScreen(
-                    onVideoClick = { videoId, rect ->
+                    onVideoClick = { videoId, title, channelName, thumbnailUrl, rect ->
                         android.util.Log.d("Navigation", "Home: Expanding video: $videoId")
-                        miniPlayerViewModel.showPlayer(videoId = videoId, sourceRect = rect)
+                        miniPlayerViewModel.showPlayer(
+                            videoId = videoId,
+                            title = title,
+                            channelName = channelName,
+                            thumbnailUrl = thumbnailUrl,
+                            sourceRect = rect
+                        )
                     },
 
                     onSearchClick = {
@@ -247,9 +253,15 @@ fun OpenTubeNavHost(
             ) {
                 SearchScreen(
                     onBackClick = { navController.navigateUp() },
-                    onVideoClick = { videoId, rect ->
+                    onVideoClick = { videoId, title, channelName, thumbnailUrl, rect ->
                         android.util.Log.d("Navigation", "Search: Expanding video: $videoId")
-                        miniPlayerViewModel.showPlayer(videoId = videoId, sourceRect = rect)
+                        miniPlayerViewModel.showPlayer(
+                            videoId = videoId,
+                            title = title,
+                            channelName = channelName,
+                            thumbnailUrl = thumbnailUrl,
+                            sourceRect = rect
+                        )
                     },
                     onChannelClick = { channelId ->
                         navController.navigate(Screen.Channel.createRoute(channelId))
@@ -265,8 +277,14 @@ fun OpenTubeNavHost(
                 com.opentube.ui.screens.playlist.PlaylistScreen(
                     playlistId = playlistId,
                     onBackClick = { navController.navigateUp() },
-                    onVideoClick = { videoId, rect ->
-                        miniPlayerViewModel.showPlayer(videoId = videoId, sourceRect = rect)
+                    onVideoClick = { videoId, title, uploader, thumbnail, rect ->
+                        miniPlayerViewModel.showPlayer(
+                            videoId = videoId,
+                            title = title,
+                            channelName = uploader,
+                            thumbnailUrl = thumbnail,
+                            sourceRect = rect
+                        )
                     }
                 )
             }
@@ -279,8 +297,14 @@ fun OpenTubeNavHost(
                 com.opentube.ui.screens.album.AlbumScreen(
                     albumId = albumId,
                     onBackClick = { navController.navigateUp() },
-                    onVideoClick = { videoId, rect ->
-                        miniPlayerViewModel.showPlayer(videoId = videoId, sourceRect = rect)
+                    onVideoClick = { videoId, title, uploader, thumbnail, rect ->
+                        miniPlayerViewModel.showPlayer(
+                            videoId = videoId,
+                            title = title,
+                            channelName = uploader,
+                            thumbnailUrl = thumbnail,
+                            sourceRect = rect
+                        )
                     }
                 )
             }
@@ -295,8 +319,14 @@ fun OpenTubeNavHost(
                 ChannelScreen(
                     channelId = channelId,
                     onNavigateBack = { navController.navigateUp() },
-                    onVideoClick = { videoId, rect ->
-                        miniPlayerViewModel.showPlayer(videoId = videoId, sourceRect = rect)
+                    onVideoClick = { videoId, title, uploader, thumbnail, rect ->
+                        miniPlayerViewModel.showPlayer(
+                            videoId = videoId,
+                            title = title,
+                            channelName = uploader,
+                            thumbnailUrl = thumbnail,
+                            sourceRect = rect
+                        )
                     }
                 )
             }
@@ -314,8 +344,14 @@ fun OpenTubeNavHost(
             
             composable(Screen.Library.route) {
                 LibraryScreen(
-                    onVideoClick = { videoId, rect ->
-                        miniPlayerViewModel.showPlayer(videoId = videoId, sourceRect = rect)
+                    onVideoClick = { videoId, title, uploader, thumbnail, rect ->
+                        miniPlayerViewModel.showPlayer(
+                            videoId = videoId,
+                            title = title,
+                            channelName = uploader,
+                            thumbnailUrl = thumbnail,
+                            sourceRect = rect
+                        )
                     },
                     onSearchClick = {
                         navController.navigate(Screen.Search.route)
@@ -420,6 +456,8 @@ fun OpenTubeNavHost(
                         ) {
                             VideoPlayerScreen(
                                 videoId = miniPlayerState.videoId,
+                                thumbnailUrl = miniPlayerState.thumbnailUrl,
+                                title = miniPlayerState.title,
                                 existingPlayer = miniPlayerState.player,
                                 onDrag = { dragY -> dragOffset = dragY },
                                 onNavigateBack = {
@@ -438,9 +476,15 @@ fun OpenTubeNavHost(
                                     miniPlayerViewModel.hideMiniPlayer()
                                     navController.navigate(Screen.Channel.createRoute(channelId))
                                 },
-                                onVideoClick = { newVideoId, rect ->
+                                onVideoClick = { newVideoId, title, uploader, thumbnail, rect ->
                                     dragOffset = 0f
-                                    miniPlayerViewModel.showPlayer(newVideoId, sourceRect = rect)
+                                    miniPlayerViewModel.showPlayer(
+                                        videoId = newVideoId,
+                                        title = title,
+                                        channelName = uploader,
+                                        thumbnailUrl = thumbnail,
+                                        sourceRect = rect
+                                    )
                                 },
                                 onMinimize = { title, channel, thumbnailUrl, isPlaying, player ->
                                     dragOffset = 0f

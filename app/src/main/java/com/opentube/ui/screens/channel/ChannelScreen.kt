@@ -21,7 +21,7 @@ import com.opentube.ui.screens.channel.components.*
 fun ChannelScreen(
     channelId: String,
     onNavigateBack: () -> Unit,
-    onVideoClick: (String, androidx.compose.ui.geometry.Rect?) -> Unit,
+    onVideoClick: (String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit,
     viewModel: ChannelViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -152,8 +152,8 @@ fun ChannelScreen(
                                     ) { video ->
                                         VideoCard(
                                             video = video,
-                                            onClickWithRect = { rect -> onVideoClick(video.videoId, rect) },
-                                            onClick = { onVideoClick(video.videoId, null) },
+                                            onClickWithRect = { rect -> onVideoClick(video.videoId, video.title, video.uploaderName ?: "Unknown", video.thumbnail, rect) },
+                                            onClick = { onVideoClick(video.videoId, video.title, video.uploaderName ?: "Unknown", video.thumbnail, null) },
                                             modifier = Modifier.padding(vertical = 8.dp)
                                         )
                                     }

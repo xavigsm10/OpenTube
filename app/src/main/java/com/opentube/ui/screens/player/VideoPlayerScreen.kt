@@ -64,9 +64,11 @@ import kotlinx.coroutines.isActive
 @Composable
 fun VideoPlayerScreen(
     videoId: String,
+    thumbnailUrl: String = "",
+    title: String = "",
     onNavigateBack: () -> Unit,
     onChannelClick: ((String) -> Unit)? = null,
-    onVideoClick: ((String, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
+    onVideoClick: ((String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
     onDrag: (Float) -> Unit = {},
     onMinimize: ((title: String, channel: String, thumbnailUrl: String, isPlaying: Boolean, player: androidx.media3.exoplayer.ExoPlayer?) -> Unit)? = null,
     existingPlayer: androidx.media3.exoplayer.ExoPlayer? = null,
@@ -220,18 +222,36 @@ fun VideoPlayerScreen(
                         .aspectRatio(16f / 9f)
                         .background(Color.Black)
                 ) {
-                    // Removed Generic CircularProgressIndicator to make it load visually instantly
+                    if (thumbnailUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = thumbnailUrl.replace("hqdefault.jpg", "maxresdefault.jpg").replace("mqdefault.jpg", "maxresdefault.jpg"),
+                            contentDescription = "Loading thumb",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
                 }
                 
-                // Title Skeleton
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(0.7f)
-                        .height(24.dp)
-                        .background(Color.DarkGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                )
+                if (title.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    // Title Skeleton
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .fillMaxWidth(0.7f)
+                            .height(24.dp)
+                            .background(Color.DarkGray, shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                    )
+                }
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 Box(
@@ -892,7 +912,7 @@ fun VideoPlayerScreen(
                             onNextVideo = {
                                 if (videoDetails.relatedStreams.isNotEmpty()) {
                                     val nextVideo = videoDetails.relatedStreams.first()
-                                    onVideoClick?.invoke(nextVideo.videoId, null)
+                                    onVideoClick?.invoke(nextVideo.videoId, nextVideo.title, nextVideo.uploaderName ?: "Unknown", nextVideo.thumbnail, null)
                                 }
                             },
                             onPreviousVideo = {
@@ -965,11 +985,11 @@ fun VideoPlayerScreen(
                                                 video = relatedVideo,
                                                 onClickWithRect = { rect ->
                                                     showMoreVideos = false
-                                                    onVideoClick?.invoke(relatedVideo.videoId, rect)
+                                                    onVideoClick?.invoke(relatedVideo.videoId, relatedVideo.title, relatedVideo.uploaderName ?: "Unknown", relatedVideo.thumbnail, rect)
                                                 },
-                                                onClick = { 
+                                                onClick = {
                                                     showMoreVideos = false
-                                                    onVideoClick?.invoke(relatedVideo.videoId, null)
+                                                    onVideoClick?.invoke(relatedVideo.videoId, relatedVideo.title, relatedVideo.uploaderName ?: "Unknown", relatedVideo.thumbnail, null)
                                                 }
                                             )
                                         }
@@ -1077,10 +1097,10 @@ fun VideoPlayerScreen(
                             VideoCard(
                                 video = relatedVideo,
                                 onClickWithRect = { rect ->
-                                    onVideoClick?.invoke(relatedVideo.videoId, rect)
+                                    onVideoClick?.invoke(relatedVideo.videoId, relatedVideo.title, relatedVideo.uploaderName ?: "Unknown", relatedVideo.thumbnail, rect)
                                 },
-                                onClick = { 
-                                    onVideoClick?.invoke(relatedVideo.videoId, null)
+                                onClick = {
+                                    onVideoClick?.invoke(relatedVideo.videoId, relatedVideo.title, relatedVideo.uploaderName ?: "Unknown", relatedVideo.thumbnail, null)
                                 },
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                             )

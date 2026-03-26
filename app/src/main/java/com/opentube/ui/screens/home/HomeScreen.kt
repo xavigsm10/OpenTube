@@ -31,7 +31,7 @@ import com.opentube.ui.components.VideoCard
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onVideoClick: (String, androidx.compose.ui.geometry.Rect?) -> Unit,
+    onVideoClick: (String, String, String, String, androidx.compose.ui.geometry.Rect?) -> Unit,
     onSearchClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -210,8 +210,8 @@ fun HomeScreen(
                         ) { video ->
                             VideoCard(
                                 video = video,
-                                onClickWithRect = { rect -> onVideoClick(video.videoId, rect) },
-                                onClick = { onVideoClick(video.videoId, null) }
+                                onClickWithRect = { rect -> onVideoClick(video.videoId, video.title, video.uploaderName, video.thumbnail, rect) },
+                                onClick = { onVideoClick(video.videoId, video.title, video.uploaderName, video.thumbnail, null) }
                             )
                         }
                         
