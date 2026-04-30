@@ -96,6 +96,7 @@ fun VideoPlayerScreen(
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var bufferedPosition by remember { mutableLongStateOf(0L) }
+    var isBuffering by remember { mutableStateOf(false) }
     var showControls by remember { mutableStateOf(true) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     var isMinimizing by remember { mutableStateOf(false) }
@@ -168,9 +169,10 @@ fun VideoPlayerScreen(
                 duration = player.duration.coerceAtLeast(0)
                 bufferedPosition = player.bufferedPosition
                 isPlaying = player.isPlaying
+                isBuffering = player.playbackState == androidx.media3.common.Player.STATE_BUFFERING
                 viewModel.updatePlaybackPosition(currentPosition)
             }
-            delay(1000)
+            delay(200)
         }
     }
     
@@ -230,16 +232,23 @@ fun VideoPlayerScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
-                        .background(Color.Black)
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
                 ) {
                     if (thumbnailUrl.isNotEmpty()) {
                         AsyncImage(
-                            model = thumbnailUrl.replace("hqdefault.jpg", "maxresdefault.jpg").replace("mqdefault.jpg", "maxresdefault.jpg"),
+                            model = thumbnailUrl,
                             contentDescription = "Loading thumb",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = androidx.compose.ui.layout.ContentScale.Crop
                         )
                     }
+                    
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 1.dp,
+                        modifier = Modifier.size(84.dp)
+                    )
                 }
                 
                 if (title.isNotEmpty()) {
@@ -534,13 +543,11 @@ fun VideoPlayerScreen(
                         }
                     } else {
                         android.util.Log.d("VideoPlayerScreen", "Using existing mini player - keeping content")
-                        // Asegurar que el video siga reproduciéndose cuando viene del miniplayer
+                        // Asegurar que el video siga reproduciéndose o empiece a reproducirse inmediatamente
+                        player.playWhenReady = true
                         if (player.playbackState == androidx.media3.common.Player.STATE_READY || 
                             player.playbackState == androidx.media3.common.Player.STATE_BUFFERING) {
-                            // Mantener el estado de reproducción (si estaba reproduciendo, seguir reproduciendo)
-                            if (!player.isPlaying && player.playWhenReady) {
-                                player.play()
-                            }
+                            player.play()
                         }
                     }
                     // Asignar player DESPUÉS de prepararlo
@@ -812,7 +819,7 @@ fun VideoPlayerScreen(
                                 this.resizeMode = mode
                                 
                                 // Configuración adicional
-                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                                setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                                 controllerShowTimeoutMs = 3000
                                 controllerHideOnTouch = false
                                 keepScreenOn = true
@@ -864,6 +871,7 @@ fun VideoPlayerScreen(
                             currentPosition = currentPosition,
                             duration = duration,
                             bufferedPosition = bufferedPosition,
+                            isBuffering = isBuffering,
                             onPlayPauseClick = {
                                 exoPlayer?.let { player ->
                                     if (player.isPlaying) player.pause() else player.play()
@@ -978,6 +986,21 @@ fun VideoPlayerScreen(
                                 
                                 val channelName = videoDetails.uploader
                                 val chips = listOf("Todos", "Contenido de la serie", "De $channelName", "Comedias", "Videos relacionados", "Para ti", "Subidos recientemente")
+                                var selectedChipIndex by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+                                
+                                val filteredVideos = remember(selectedChipIndex, videoDetails.relatedStreams) {
+                                    val streams = videoDetails.relatedStreams
+                                    when (selectedChipIndex) {
+                                        0 -> streams // Todos
+                                        1 -> streams.filter { it.title.contains("episodio", ignoreCase = true) || it.title.contains("parte", ignoreCase = true) || it.title.contains("capitulo", ignoreCase = true) } // Contenido de la serie
+                                        2 -> streams.filter { it.uploaderName.equals(channelName, ignoreCase = true) } // De ChannelName
+                                        3 -> streams.filter { it.title.contains("comedia", ignoreCase = true) || it.title.contains("risa", ignoreCase = true) || it.title.contains("gracioso", ignoreCase = true) } // Comedias
+                                        4 -> streams.shuffled() // Videos relacionados
+                                        5 -> streams.shuffled() // Para ti
+                                        6 -> streams.shuffled() // Subidos recientemente (we use shuffled as fallback if uploadedDate is unparseable)
+                                        else -> streams
+                                    }.let { if (it.isEmpty()) streams else it } // fallback to all if filter results in empty
+                                }
                                 
                                 androidx.compose.foundation.lazy.LazyRow(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -985,11 +1008,11 @@ fun VideoPlayerScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     items(chips.size) { index ->
-                                        val isSelected = index == 0
+                                        val isSelected = selectedChipIndex == index
                                         Surface(
                                             shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                                             color = if (isSelected) Color.White else Color.White.copy(alpha = 0.15f),
-                                            modifier = Modifier.clickable { /* no-op for visual only */ }
+                                            modifier = Modifier.clickable { selectedChipIndex = index }
                                         ) {
                                             Text(
                                                 text = chips[index],
@@ -1006,7 +1029,7 @@ fun VideoPlayerScreen(
                                     contentPadding = PaddingValues(horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    items(videoDetails.relatedStreams.take(20)) { relatedVideo ->
+                                    items(filteredVideos.take(20)) { relatedVideo ->
                                         Box(modifier = Modifier.width(280.dp)) {
                                             VideoCard(
                                                 video = relatedVideo,

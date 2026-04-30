@@ -65,7 +65,8 @@ fun OpenTubeNavHost(
     val showBottomBar = currentDestination?.route in listOf(
         Screen.Home.route,
         Screen.Subscriptions.route,
-        Screen.Library.route
+        Screen.Library.route,
+        Screen.Search.route
     ) && !miniPlayerState.isExpanded
     
     // Hide mini player when on video player screen
@@ -540,6 +541,16 @@ fun OpenTubeNavHost(
                         offsetY.snapTo(maxY)
                     }
 
+                    LaunchedEffect(maxY) {
+                        if (!isMiniPlayerExpanded) {
+                            // Automatically adjust Y when bottom menu appears/disappears to prevent jumps
+                            offsetY.snapTo(offsetY.value.coerceIn(minY, maxY))
+                        } else {
+                            // Ensure it doesn't go below the new bottom bounds
+                            offsetY.snapTo(offsetY.value.coerceIn(minY, maxExpandedY))
+                        }
+                    }
+
                     Box(
                         modifier = Modifier
                             .offset { androidx.compose.ui.unit.IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
@@ -548,9 +559,8 @@ fun OpenTubeNavHost(
                                     onDragEnd = {
                                         scope.launch {
                                             if (isMiniPlayerExpanded) {
-                                                val targetY = if (offsetY.value < midY) minY else maxExpandedY
-                                                offsetY.animateTo(targetY, androidx.compose.animation.core.spring(stiffness = 300f))
                                                 offsetX.animateTo(0f, androidx.compose.animation.core.spring(stiffness = 300f))
+                                                // Keep the current Y position as dragged
                                             } else {
                                                 val targetX = if (offsetX.value < midX) minX else maxX
                                                 val targetY = if (offsetY.value < midY) minY else maxY
@@ -583,8 +593,8 @@ fun OpenTubeNavHost(
                                 scope.launch {
                                     if (expanded) {
                                         offsetX.animateTo(0f, androidx.compose.animation.core.spring(stiffness = 300f))
-                                        val targetY = if (offsetY.value < midY) minY else maxExpandedY
-                                        offsetY.animateTo(targetY, androidx.compose.animation.core.spring(stiffness = 300f))
+                                        // Keep current Y position when expanding
+                                        offsetY.animateTo(offsetY.value.coerceIn(minY, maxExpandedY), androidx.compose.animation.core.spring(stiffness = 300f))
                                     } else {
                                         val targetX = if (offsetX.value < midX) minX else maxX
                                         offsetX.animateTo(targetX, androidx.compose.animation.core.spring(stiffness = 300f))

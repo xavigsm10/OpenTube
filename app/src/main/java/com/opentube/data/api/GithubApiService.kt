@@ -13,7 +13,7 @@ interface GithubApiService {
     
     companion object {
         const val BASE_URL = "https://api.github.com/"
-        const val REPO_OWNER = "xavigsm5"
+        const val REPO_OWNER = "xavigsm10"
         const val REPO_NAME = "OpenTube"
     }
     

@@ -287,7 +287,7 @@ fun SettingsScreen(
                     title = "Código fuente",
                     subtitle = "Ver en GitHub",
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/xavigsm5/OpenTube"))
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/xavigsm10/OpenTube"))
                         context.startActivity(intent)
                     }
                 )

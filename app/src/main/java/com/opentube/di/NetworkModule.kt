@@ -47,8 +47,16 @@ object NetworkModule {
             level = HttpLoggingInterceptor.Level.BODY
         }
         
+        val languageInterceptor = okhttp3.Interceptor { chain ->
+            val request = chain.request().newBuilder()
+                .addHeader("Accept-Language", java.util.Locale.getDefault().toLanguageTag())
+                .build()
+            chain.proceed(request)
+        }
+        
         return OkHttpClient.Builder()
             .addInterceptor(baseUrlInterceptor) // DYNAMIC URL INJECTION
+            .addInterceptor(languageInterceptor) // PREVENT AUTO-TRANSLATION
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

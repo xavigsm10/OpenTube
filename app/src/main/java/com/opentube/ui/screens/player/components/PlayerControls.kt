@@ -187,8 +187,8 @@ fun PlayerControls(
                     if (isBuffering) {
                         CircularProgressIndicator(
                             color = Color.White,
-                            strokeWidth = 1.5.dp,
-                            modifier = Modifier.size(if (isFullscreen) 80.dp else 66.dp)
+                            strokeWidth = 1.dp,
+                            modifier = Modifier.size(if (isFullscreen) 100.dp else 84.dp)
                         )
                     } else {
                         Icon(
@@ -286,13 +286,13 @@ fun PlayerControls(
                     }
                     
                     IconButton(onClick = onFullscreenClick) {
-                        // Draw simplified arrows vectors
-                        val iconRes = if (isFullscreen) R.drawable.ic_fullscreen_exit_custom else R.drawable.ic_fullscreen_enter_custom
+                        // Use provided zoom/shrink PNG icons
+                        val iconRes = if (isFullscreen) R.drawable.boton_achicar else R.drawable.boton_zoom
                         
-                        Icon(
+                        androidx.compose.foundation.Image(
                             painter = painterResource(id = iconRes),
                             contentDescription = if (isFullscreen) "Salir de pantalla completa" else "Pantalla completa",
-                            tint = Color.White
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                 }
