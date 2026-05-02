@@ -1,6 +1,9 @@
 package com.opentube.ui.screens.player.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -145,59 +148,43 @@ fun PlayerControls(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Previous Video
-                IconButton(
-                    onClick = onPreviousVideo,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(if (isFullscreen) 64.dp else 56.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable(onClick = onPreviousVideo)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.SkipPrevious,
                         contentDescription = "Video Anterior",
                         tint = Color.White,
-                        modifier = Modifier.size(if (isFullscreen) 36.dp else 32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-                  Spacer(modifier = Modifier.width(32.dp))
-                  // Play/Pause
 
-                var playPauseScale by remember { mutableStateOf(1f) }
-                LaunchedEffect(isPlaying) {
-                    playPauseScale = 1.3f
-                    kotlinx.coroutines.delay(100)
-                    playPauseScale = 1f
-                }
-                
-                val animatedScale by androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = playPauseScale,
-                    animationSpec = androidx.compose.animation.core.spring(
-                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                        stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-                    ), label = "playPauseScale"
-                )
+                Spacer(modifier = Modifier.width(32.dp))
 
-                IconButton(
-                    onClick = { 
-                        onPlayPauseClick()
-                    },
+                // Play/Pause
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(if (isFullscreen) 86.dp else 72.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable(onClick = onPlayPauseClick)
                 ) {
                     if (isBuffering) {
                         CircularProgressIndicator(
                             color = Color.White,
-                            strokeWidth = 1.dp,
-                            modifier = Modifier.size(if (isFullscreen) 100.dp else 84.dp)
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(40.dp)
                         )
                     } else {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .size(if (isFullscreen) 56.dp else 48.dp)
-                                .scale(animatedScale)
+                        MorphingPlayPauseIcon(
+                            isPlaying = isPlaying,
+                            modifier = Modifier.size(40.dp)
                         )
                     }
                 }
@@ -205,17 +192,19 @@ fun PlayerControls(
                 Spacer(modifier = Modifier.width(32.dp))
 
                 // Next Video
-                IconButton(
-                    onClick = onNextVideo,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(if (isFullscreen) 64.dp else 56.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable(onClick = onNextVideo)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.SkipNext,
                         contentDescription = "Siguiente Video",
                         tint = Color.White,
-                        modifier = Modifier.size(if (isFullscreen) 36.dp else 32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -223,10 +212,7 @@ fun PlayerControls(
             // Bottom Bar
             Column(
                 modifier = Modifier
-                    .then(
-                        if (isFullscreen) Modifier.fillMaxWidth(0.85f)
-                        else Modifier.fillMaxWidth()
-                    )
+                    .fillMaxWidth()
                     .align(Alignment.BottomCenter)
                     .background(
                         brush = Brush.verticalGradient(
@@ -236,13 +222,16 @@ fun PlayerControls(
                             )
                         )
                     )
-                    .padding(bottom = if (isFullscreen) 24.dp else 0.dp) // Raise controls in fullscreen
             ) {
                 // Time and Fullscreen (Above Seekbar)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(
+                            horizontal = if (isFullscreen) 16.dp else 2.dp,
+                            vertical = if (isFullscreen) 4.dp else 0.dp
+                        )
+                        .offset(y = if (isFullscreen) 0.dp else 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -273,37 +262,44 @@ fun PlayerControls(
                     } else {
                         Surface(
                             color = Color.Black.copy(alpha = 0.5f),
-                            shape = CircleShape,
-                            modifier = Modifier.padding(start = 8.dp)
+                            shape = CircleShape
                         ) {
                             Text(
                                 text = "${formatDuration(currentPosition)} / ${formatDuration(duration)}",
                                 color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
                     
-                    IconButton(onClick = onFullscreenClick) {
-                        // Use provided zoom/shrink PNG icons
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .clickable { onFullscreenClick() }
+                            .padding(4.dp)
+                    ) {
                         val iconRes = if (isFullscreen) R.drawable.boton_achicar else R.drawable.boton_zoom
                         
                         androidx.compose.foundation.Image(
                             painter = painterResource(id = iconRes),
                             contentDescription = if (isFullscreen) "Salir de pantalla completa" else "Pantalla completa",
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
                 
-                // Edge-to-Edge Seek Bar
+                // Edge-to-Edge Seek Bar (unless fullscreen)
                 VideoProgressBar(
                     currentPosition = currentPosition,
                     duration = duration,
                     bufferedPosition = bufferedPosition,
                     isLive = isLive,
-                    onSeek = onSeek
+                    onSeek = onSeek,
+                    isFullscreen = isFullscreen,
+                    modifier = if (isFullscreen) Modifier.padding(horizontal = 16.dp) else Modifier.offset(y = 10.dp)
                 )
 
                 if (isFullscreen) {
@@ -381,6 +377,8 @@ fun VideoProgressBar(
     duration: Long,
     bufferedPosition: Long, isBuffering: Boolean = false,
     isLive: Boolean = false,
+    modifier: Modifier = Modifier,
+    isFullscreen: Boolean = false,
     onSeek: (Long) -> Unit
 ) {
     MarkableProgressBar(
@@ -389,9 +387,10 @@ fun VideoProgressBar(
         bufferedPosition = bufferedPosition,
         onSeek = onSeek,
         isLive = isLive,
-        modifier = Modifier
+        barHeight = if (isFullscreen) 4.dp else 2.dp,
+        thumbRadius = if (isFullscreen) 12.dp else 6.dp,
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
             .height(20.dp)
     )
 }
@@ -406,6 +405,81 @@ private fun formatDuration(totalSeconds: Long): String {
         String.format("%d:%02d:%02d", hours, minutes, remainingSeconds)
     } else {
         String.format("%d:%02d", minutes, remainingSeconds)
+    }
+}
+
+@Composable
+fun MorphingPlayPauseIcon(isPlaying: Boolean, modifier: Modifier = Modifier, color: Color = Color.White) {
+    val transition = updateTransition(targetState = isPlaying, label = "PlayPause")
+    
+    val progress by transition.animateFloat(
+        transitionSpec = { tween(durationMillis = 300) },
+        label = "progress"
+    ) { state -> if (state) 1f else 0f }
+
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        fun lerp(start: Float, stop: Float, fraction: Float): Float {
+            return start + (stop - start) * fraction
+        }
+        
+        fun lerp(start: androidx.compose.ui.geometry.Offset, stop: androidx.compose.ui.geometry.Offset, fraction: Float): androidx.compose.ui.geometry.Offset {
+            return androidx.compose.ui.geometry.Offset(lerp(start.x, stop.x, fraction), lerp(start.y, stop.y, fraction))
+        }
+
+        // Play Triangle Points
+        val playLTL = androidx.compose.ui.geometry.Offset(w * 0.2f, h * 0.2f)
+        val playLBL = androidx.compose.ui.geometry.Offset(w * 0.2f, h * 0.8f)
+        val playLTR = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.35f)
+        val playLBR = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.65f)
+        
+        val playRTL = playLTR
+        val playRBL = playLBR
+        val playRTR = androidx.compose.ui.geometry.Offset(w * 0.8f, h * 0.5f)
+        val playRBR = playRTR
+
+        // Pause Bars Points
+        val pauseLTL = androidx.compose.ui.geometry.Offset(w * 0.25f, h * 0.2f)
+        val pauseLBL = androidx.compose.ui.geometry.Offset(w * 0.25f, h * 0.8f)
+        val pauseLTR = androidx.compose.ui.geometry.Offset(w * 0.4f, h * 0.2f)
+        val pauseLBR = androidx.compose.ui.geometry.Offset(w * 0.4f, h * 0.8f)
+        
+        val pauseRTL = androidx.compose.ui.geometry.Offset(w * 0.6f, h * 0.2f)
+        val pauseRBL = androidx.compose.ui.geometry.Offset(w * 0.6f, h * 0.8f)
+        val pauseRTR = androidx.compose.ui.geometry.Offset(w * 0.75f, h * 0.2f)
+        val pauseRBR = androidx.compose.ui.geometry.Offset(w * 0.75f, h * 0.8f)
+
+        val currentLTL = lerp(playLTL, pauseLTL, progress)
+        val currentLBL = lerp(playLBL, pauseLBL, progress)
+        val currentLTR = lerp(playLTR, pauseLTR, progress)
+        val currentLBR = lerp(playLBR, pauseLBR, progress)
+
+        val currentRTL = lerp(playRTL, pauseRTL, progress)
+        val currentRBL = lerp(playRBL, pauseRBL, progress)
+        val currentRTR = lerp(playRTR, pauseRTR, progress)
+        val currentRBR = lerp(playRBR, pauseRBR, progress)
+
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(currentLTL.x, currentLTL.y)
+            lineTo(currentLTR.x, currentLTR.y)
+            lineTo(currentLBR.x, currentLBR.y)
+            lineTo(currentLBL.x, currentLBL.y)
+            close()
+
+            moveTo(currentRTL.x, currentRTL.y)
+            lineTo(currentRTR.x, currentRTR.y)
+            lineTo(currentRBR.x, currentRBR.y)
+            lineTo(currentRBL.x, currentRBL.y)
+            close()
+        }
+
+        drawPath(
+            path = path,
+            color = color,
+            style = androidx.compose.ui.graphics.drawscope.Fill
+        )
     }
 }
 

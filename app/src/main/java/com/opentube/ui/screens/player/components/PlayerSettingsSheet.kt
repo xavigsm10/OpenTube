@@ -221,9 +221,7 @@ private fun MainSettings(
                 icon = Icons.Default.GraphicEq,
                 title = "Pista de audio",
                 subtitle = currentAudioTrack?.let { stream -> 
-                    // Need to inline the logic or pass it down. Assuming it's simple enough if we extract the function or copy it.
-                    // For now, let's just make it simple if we can't call getAudioTrackDisplayName directly from here.
-                    "Audio seleccionado" // Or pass a lambda to format it
+                    getAudioTrackDisplayName(stream)
                 } ?: "Audio principal",
                 onClick = onAudioClick
             )
@@ -351,61 +349,6 @@ private fun AudioSettings(
     onAudioSelected: (AudioStream) -> Unit,
     onBack: () -> Unit
 ) {
-    // Helper function to get display name for audio track
-    fun getAudioTrackDisplayName(stream: AudioStream): String {
-        val trackName = stream.audioTrackName
-        
-        // Filter out codec raw strings that Piped mistakenly passes as "audioTrackName" occasionally
-        val invalidNames = listOf("opus", "webm", "m4a", "mp4a", "aac", "vorbis")
-        val isValidName = !trackName.isNullOrEmpty() && invalidNames.none { trackName.contains(it, ignoreCase = true) }
-        
-        if (isValidName) {
-            return trackName!!
-        }
-
-        val trackId = stream.audioTrackId
-        if (!trackId.isNullOrEmpty()) {
-            val languageCode = trackId.split(".").firstOrNull() ?: trackId
-            try {
-                // Try treating it as a locale code, which covers almost all languages
-                val localeName = java.util.Locale(languageCode).displayLanguage
-                if (localeName.isNotEmpty() && localeName != languageCode) {
-                    return localeName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-                }
-            } catch (e: Exception) {
-                // Ignore locale error
-            }
-            
-            // Fallback manual mapping
-            val languageName = try {
-                val localeName = java.util.Locale(languageCode).displayLanguage
-                if (localeName.isNotEmpty() && localeName != languageCode) {
-                    localeName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-                } else {
-                    languageCode.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-                }
-            } catch (e: Exception) {
-                languageCode.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-            }
-            
-            return languageName
-        }
-        
-        return "Audio original"
-    }
-    
-    fun getAudioTrackSubtitle(stream: AudioStream): String {
-        val bitrate = stream.bitrate?.let { "${it / 1000} kbps" } ?: ""
-        val format = when {
-            stream.mimeType.contains("opus", ignoreCase = true) -> "Opus"
-            stream.mimeType.contains("aac", ignoreCase = true) -> "AAC"
-            stream.mimeType.contains("mp4a", ignoreCase = true) -> "AAC"
-            stream.mimeType.contains("vorbis", ignoreCase = true) -> "Vorbis"
-            else -> stream.format
-        }
-        return if (bitrate.isNotEmpty()) "$format • $bitrate" else format
-    }
-
     LazyColumn(modifier = Modifier.fillMaxWidth()) {
         item {
             SettingsItem(
@@ -441,6 +384,60 @@ private fun AudioSettings(
     }
 }
 
+// Helper function to get display name for audio track
+fun getAudioTrackDisplayName(stream: AudioStream): String {
+    val trackName = stream.audioTrackName
+    
+    // Filter out codec raw strings that Piped mistakenly passes as "audioTrackName" occasionally
+    val invalidNames = listOf("opus", "webm", "m4a", "mp4a", "aac", "vorbis")
+    val isValidName = !trackName.isNullOrEmpty() && invalidNames.none { trackName.contains(it, ignoreCase = true) }
+    
+    if (isValidName) {
+        return trackName!!
+    }
+
+    val trackId = stream.audioTrackId
+    if (!trackId.isNullOrEmpty()) {
+        val languageCode = trackId.split(".").firstOrNull() ?: trackId
+        try {
+            // Try treating it as a locale code, which covers almost all languages
+            val localeName = java.util.Locale(languageCode).displayLanguage
+            if (localeName.isNotEmpty() && localeName != languageCode) {
+                return localeName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+            }
+        } catch (e: Exception) {
+            // Ignore locale error
+        }
+        
+        // Fallback manual mapping
+        val languageName = try {
+            val localeName = java.util.Locale(languageCode).displayLanguage
+            if (localeName.isNotEmpty() && localeName != languageCode) {
+                localeName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+            } else {
+                languageCode.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+            }
+        } catch (e: Exception) {
+            languageCode.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+        }
+        
+        return languageName
+    }
+    
+    return "Audio original"
+}
+
+fun getAudioTrackSubtitle(stream: AudioStream): String {
+    val bitrate = stream.bitrate?.let { "${it / 1000} kbps" } ?: ""
+    val format = when {
+        stream.mimeType.contains("opus", ignoreCase = true) -> "Opus"
+        stream.mimeType.contains("aac", ignoreCase = true) -> "AAC"
+        stream.mimeType.contains("mp4a", ignoreCase = true) -> "AAC"
+        stream.mimeType.contains("vorbis", ignoreCase = true) -> "Vorbis"
+        else -> stream.format
+    }
+    return if (bitrate.isNotEmpty()) "$format • $bitrate" else format
+}
 
 @Composable
 private fun SubtitlesSettings(

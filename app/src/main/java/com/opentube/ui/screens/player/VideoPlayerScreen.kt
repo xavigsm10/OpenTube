@@ -78,8 +78,12 @@ fun VideoPlayerScreen(
     
     val uiState by viewModel.uiState.collectAsState()
     
+    // Flag to skip the first LaunchedEffect(selectedQuality) fire - DisposableEffect handles initial load
+    var skipInitialQualityChange by remember { mutableStateOf(true) }
+    
     LaunchedEffect(videoId) {
         viewModel.setVideoId(videoId)
+        skipInitialQualityChange = true // Reset for new video
     }
     
     BackHandler {
@@ -103,9 +107,6 @@ fun VideoPlayerScreen(
     var showMoreVideos by remember { mutableStateOf(false) }
     var showComments by remember { mutableStateOf(false) } // For landscape panel
     var showCommentsPanel by remember { mutableStateOf(false) } // For portrait sliding panel
-    
-    // Flag to skip the first LaunchedEffect(selectedQuality) fire - DisposableEffect handles initial load
-    var skipInitialQualityChange by remember { mutableStateOf(true) }
     
     // Manage fullscreen
     val activity = context as? Activity
@@ -575,7 +576,11 @@ fun VideoPlayerScreen(
                 onDispose {
                     // No liberar el player aquí, es gestionado por PlayerManager
                     if (!isMinimizing) {
-                        player.pause()
+                        // Solo pausar si el video actual de PlayerManager sigue siendo el de esta pantalla
+                        // (Evita pausar el nuevo video al navegar a otro video en pantalla completa)
+                        if (viewModel.isCurrentVideo(videoId)) {
+                            player.pause()
+                        }
                     }
                 }
             }

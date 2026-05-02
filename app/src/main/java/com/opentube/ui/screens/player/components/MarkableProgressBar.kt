@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -50,6 +51,7 @@ fun MarkableProgressBar(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp) // Touch target size
+            .systemGestureExclusion()
             .pointerInput(isLive) {
                 if (!isLive) {
                     detectTapGestures { offset ->

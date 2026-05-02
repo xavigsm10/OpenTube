@@ -176,13 +176,37 @@ class VideoPlayerViewModel @Inject constructor(
                                 val bestAudio = if (bestVideo?.videoOnly == true) {
                                     val validAudioStreams = details.audioStreams.filter { !it.url.isNullOrEmpty() }
                                     
-                                    // Preferir pista original
+                                    val systemLang = java.util.Locale.getDefault().language // e.g. "es"
+                                    
+                                    // 1. Preferir pista original explícita
                                     val originalAudio = validAudioStreams.find { 
+                                        it.audioTrackId?.contains("orig", ignoreCase = true) == true ||
+                                        it.audioTrackName?.contains("orig", ignoreCase = true) == true ||
                                         it.audioTrackId?.contains("original", ignoreCase = true) == true ||
                                         it.audioTrackName?.contains("original", ignoreCase = true) == true 
-                                    } ?: validAudioStreams.find { it.audioTrackId == null && it.audioTrackName == null }
+                                    }
                                     
-                                    originalAudio ?: validAudioStreams.maxByOrNull { it.bitrate ?: 0 }
+                                    // 2. Pista del idioma del sistema
+                                    val localizedAudio = validAudioStreams.find { 
+                                        it.audioTrackId?.startsWith(systemLang, ignoreCase = true) == true ||
+                                        it.audioTrackName?.contains(java.util.Locale.getDefault().displayLanguage, ignoreCase = true) == true ||
+                                        (systemLang == "es" && it.audioTrackName?.contains("Spanish", ignoreCase = true) == true)
+                                    }
+                                    
+                                    // 3. Pista en español genérica (fallback fuerte contra el doblaje al inglés)
+                                    val esTrack = validAudioStreams.find {
+                                        it.audioTrackId?.startsWith("es", ignoreCase = true) == true ||
+                                        it.audioTrackName?.contains("espanol", ignoreCase = true) == true ||
+                                        it.audioTrackName?.contains("español", ignoreCase = true) == true ||
+                                        it.audioTrackName?.contains("spanish", ignoreCase = true) == true
+                                    }
+                                    
+                                    // 4. Pista sin ID (suele ser el default original)
+                                    val unlabeledAudio = validAudioStreams.find { 
+                                        it.audioTrackId == null && it.audioTrackName == null 
+                                    }
+                                    
+                                    originalAudio ?: localizedAudio ?: esTrack ?: unlabeledAudio ?: validAudioStreams.firstOrNull()
                                 } else {
                                     null
                                 }
