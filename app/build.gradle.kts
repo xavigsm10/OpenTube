@@ -24,8 +24,8 @@ android {
         applicationId = "com.opentube"
         minSdk = 24
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.1.9"
+        versionCode = 10
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
